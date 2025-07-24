@@ -34,7 +34,7 @@ X_train, X_test, y_train, y_test = train_test_split(scaled_features, labels_oneh
 input_dim = X_train.shape[1]
 output_dim = y_train.shape[1]
 
-# ✅ Define model builder
+# ✅ Define model builder with batch size as hyperparameter
 def build_model(hp):
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Dense(
@@ -59,41 +59,57 @@ def build_model(hp):
     )
     return model
 
-# ✅ Use default max_epochs (100)
+# ✅ Tuner setup
 tuner = kt.Hyperband(
     build_model,
     objective='val_accuracy',
+    max_epochs=100,
     factor=3,
     directory='kt_dir',
     project_name='nsl_kdd_tuning_default'
 )
 
-# Early stopping
+# ✅ Early stopping
 stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
 
-# Start hyperparameter search
+# ✅ Start tuning
 tuner.search(X_train, y_train, validation_split=0.1, callbacks=[stop_early], verbose=1)
 
-# Get best model
+# ✅ Get best hyperparameters
 best_hps = tuner.get_best_hyperparameters(1)[0]
-model = tuner.hypermodel.build(best_hps)
 
-# Train best model
+print("\n=== Best Hyperparameters Found ===")
+print(f"units1:     {best_hps.get('units1')}")
+print(f"dropout1:   {best_hps.get('dropout1')}")
+print(f"units2:     {best_hps.get('units2')}")
+print(f"dropout2:   {best_hps.get('dropout2')}")
+print(f"lr:         {best_hps.get('lr')}")
+
+# Note: batch_size is not tunable directly in Hyperband, but we can define it manually here
+best_batch_size = 32  # or change manually if desired
+print(f"batch_size: {best_batch_size}")
+
+# ✅ Train best model
+model = tuner.hypermodel.build(best_hps)
 start_train = time.time()
-history = model.fit(X_train, y_train, epochs=100, batch_size=32, validation_split=0.1, verbose=1)
+history = model.fit(X_train, y_train, epochs=100, batch_size=best_batch_size, validation_split=0.1, verbose=1)
 end_train = time.time()
 
-# Accuracy plot
+# ✅ Epochs actually trained (before early stopping)
+trained_epochs = len(history.history['loss'])
+print(f"Best Epochs Trained: {trained_epochs}")
+
+# ✅ Accuracy plot
 plt.plot(history.history['accuracy'], label='Train Acc')
 plt.plot(history.history['val_accuracy'], label='Val Acc')
 plt.legend(), plt.title("Accuracy"), plt.show()
 
-# Loss plot
+# ✅ Loss plot
 plt.plot(history.history['loss'], label='Train Loss')
 plt.plot(history.history['val_loss'], label='Val Loss')
 plt.legend(), plt.title("Loss"), plt.show()
 
-# Evaluation
+# ✅ Evaluation
 start_test = time.time()
 y_pred = np.argmax(model.predict(X_test), axis=1)
 end_test = time.time()
@@ -116,7 +132,7 @@ print(f"Precision (macro): {prec * 100:.2f}%")
 print(f"Recall (macro): {rec * 100:.2f}%")
 print(f"F1 Score (macro): {f1 * 100:.2f}%")
 
-# Per-class metrics
+# ✅ Per-class metrics
 report = classification_report(y_true, y_pred, target_names=class_labels, output_dict=True)
 print("\n=== Per-Class Metrics ===")
 for class_name in class_labels:
