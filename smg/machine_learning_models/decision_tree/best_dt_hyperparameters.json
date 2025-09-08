@@ -1,0 +1,14 @@
+{
+  "best_parameters": {
+    "splitter": "best",
+    "min_samples_split": 15,
+    "min_samples_leaf": 8,
+    "max_leaf_nodes": 200,
+    "max_features": null,
+    "max_depth": 25,
+    "criterion": "entropy",
+    "class_weight": null
+  },
+  "best_cv_score": 0.8989392575416749,
+  "model_type": "DecisionTreeClassifier"
+}
