@@ -64,6 +64,11 @@ for i in range(K):
 
 # Track metrics for plotting
 round_metrics = {'accuracy': [], 'precision': [], 'recall': [], 'f1_score': []}
+
+# [Timing addition] Totals for fits and inference+aggregation
+total_train_time = 0.0
+total_test_time = 0.0
+
 start_train = time.time()
 
 # This list will store all models trained across all rounds to form the ensemble
@@ -81,7 +86,12 @@ for r in range(R):
         
         # Instantiate and train a Decision Tree Classifier
         client_dt = DecisionTreeClassifier(random_state=42)
+        # [Timing addition] measure fit time per client
+        _fit_start = time.time()
         client_dt.fit(X_client, y_client)
+        _fit_end = time.time()
+        total_train_time += (_fit_end - _fit_start)
+
         trained_models.append(client_dt)
     
     # Add models from this round to the global ensemble
@@ -90,6 +100,8 @@ for r in range(R):
     # --- Server Aggregation (Majority Voting) and Evaluation ---
     
     # 1. Generate predictions from all models in the ensemble on the global test set
+    # [Timing addition] measure inference + aggregation time for the round
+    _test_start = time.time()
     predictions = []
     for model in federated_ensemble:
         predictions.append(model.predict(X_test))
@@ -105,6 +117,8 @@ for r in range(R):
 
     aggregated_predictions = np.apply_along_axis(majority_vote, axis=1, arr=predictions_array)
     y_pred = aggregated_predictions
+    _test_end = time.time()
+    total_test_time += (_test_end - _test_start)
     
     # 3. Evaluate the ensemble performance at this round
     acc = accuracy_score(y_test, y_pred)
@@ -126,6 +140,10 @@ end_train = time.time()
 
 print("\n=== Final Ensemble Model Metrics ===")
 print(f"Training Time: {end_train - start_train:.2f} seconds (Total FL simulation time)")
+
+# [Timing addition] Print totals for fits and inference
+print(f"Total Training Time (fits only): {total_train_time:.2f} seconds")
+print(f"Total Testing Time  (inference + aggregation): {total_test_time:.2f} seconds")
 
 # Use metrics from the final round (since y_pred and metrics variables hold the final results)
 final_acc = round_metrics['accuracy'][-1] / 100

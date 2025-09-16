@@ -1,0 +1,16 @@
+{
+  "best_parameters": {
+    "weights": "uniform",
+    "p": 1,
+    "n_neighbors": 7,
+    "metric": "minkowski",
+    "leaf_size": 40
+  },
+  "best_cv_score": 0.889776826767795,
+  "model_type": "KNeighborsClassifier",
+  "class_names": [
+    "FDIA",
+    "Normal",
+    "TDA"
+  ]
+}

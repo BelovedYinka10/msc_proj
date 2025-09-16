@@ -6,10 +6,10 @@ import time
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score
-from imblearn.over_sampling import RandomOverSampler
+from imblearn.over_sampling import RandomOverSampler  # ✅ Use ROS
 
 # Load dataset
-df = pd.read_csv("../../../EPIC/dataset_EPICA_raw 1.csv")
+df = pd.read_csv("../../../../EPIC/dataset_EPICA_raw 1.csv")
 print(df.columns.tolist())
 
 # Preprocessing
@@ -33,7 +33,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.3,
 
 print("y_train", y_train)
 
-# ✅ Apply Random OverSampler (ROS) to the training data
+# ✅ Apply ROS to the training data
 y_train_labels = np.argmax(y_train.values, axis=1)
 ros = RandomOverSampler(random_state=42)
 X_train, y_train_labels = ros.fit_resample(X_train, y_train_labels)
@@ -43,32 +43,28 @@ y_train = tf.keras.utils.to_categorical(y_train_labels, num_classes=y_test.shape
 input_dim = X_train.shape[1]
 output_dim = y_train.shape[1]
 
-# CNN Model using your specified parameters
+# CNN Model
 def create_cnn_model(input_dim, output_dim):
     model = tf.keras.Sequential([
         tf.keras.layers.Reshape((input_dim, 1), input_shape=(input_dim,)),
-
         tf.keras.layers.Conv1D(filters=64, kernel_size=3, activation='relu'),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.MaxPooling1D(pool_size=2),
         tf.keras.layers.Dropout(0.1),
-
         tf.keras.layers.Conv1D(filters=32, kernel_size=3, activation='relu'),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.GlobalMaxPooling1D(),
         tf.keras.layers.Dropout(0.3),
-
         tf.keras.layers.Dense(128, activation='relu'),
         tf.keras.layers.Dense(output_dim, activation='softmax')
     ])
-
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.0032164230487929987)
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
-# Build and train model
 model = create_cnn_model(input_dim, output_dim)
 
+# Train the model
 start_train = time.time()
 history = model.fit(X_train, y_train, epochs=10, batch_size=32, validation_split=0.1, verbose=1)
 end_train = time.time()
@@ -97,7 +93,7 @@ plt.show()
 
 # Prediction
 start_test = time.time()
-y_pred = np.argmax(model.predict(X_test), axis=1)
+y_pred = np.argmax(model.predict(X_test, verbose=0), axis=1)
 end_test = time.time()
 
 y_true = np.argmax(y_test.values, axis=1)
@@ -105,9 +101,9 @@ class_labels = y_test.columns.tolist()
 
 # Evaluation
 acc = accuracy_score(y_true, y_pred)
-prec = precision_score(y_true, y_pred, average='macro')
-rec = recall_score(y_true, y_pred, average='macro')
-f1 = f1_score(y_true, y_pred, average='macro')
+prec = precision_score(y_true, y_pred, average='macro', zero_division=0)
+rec = recall_score(y_true, y_pred, average='macro', zero_division=0)
+f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
 
 print("\n=== Timing ===")
 print(f"Training Time: {end_train - start_train:.2f} seconds")
@@ -120,23 +116,22 @@ print(f"Recall (macro): {rec * 100:.2f}%")
 print(f"F1 Score (macro): {f1 * 100:.2f}%")
 
 # Per-class metrics
-report = classification_report(y_true, y_pred, target_names=class_labels, output_dict=True)
+report = classification_report(y_true, y_pred, target_names=class_labels, output_dict=True, zero_division=0)
 print("\n=== Per-Class Metrics ===")
-
-# Get index mapping of class names
 class_indices = {label: idx for idx, label in enumerate(class_labels)}
 
 for class_name in class_labels:
     class_idx = class_indices[class_name]
     metrics = report[class_name]
-    
+
     true_mask = (y_true == class_idx)
     correct = np.sum((y_pred == class_idx) & true_mask)
     total = np.sum(true_mask)
     acc_class = correct / total if total > 0 else 0.0
 
     print(f"\nClass: {class_name}")
-    print(f"  Accuracy: {acc_class * 100:.2f}%")
+    print(f"  Accuracy:  {acc_class * 100:.2f}%")
     print(f"  Precision: {metrics['precision'] * 100:.2f}%")
     print(f"  Recall:    {metrics['recall'] * 100:.2f}%")
     print(f"  F1-score:  {metrics['f1-score'] * 100:.2f}%")
+    print(f"  Support:   {int(metrics['support'])}")

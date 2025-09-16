@@ -1,15 +1,22 @@
 import pandas as pd
 import numpy as np
+import time
+import json
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 # -----------------------
+# 0. Config
+# -----------------------
+DATA_CSV  = "../../../EPIC/dataset_EPICA_raw 1.csv"
+JSON_PATH = "best_dt_hyperparameters.json"   # adjust if your file lives elsewhere
+
+# -----------------------
 # 1. Load & Preprocess Data
 # -----------------------
-df = pd.read_csv("../../../EPIC/dataset_EPICA_raw 1.csv")
-
+df = pd.read_csv(DATA_CSV)
 
 def preprocess_epica(data):
     data = data.drop(columns=['Unnamed: 0', 'Unnamed: 0.1'], errors='ignore')
@@ -20,7 +27,6 @@ def preprocess_epica(data):
     scaler = MinMaxScaler()
     scaled_features = scaler.fit_transform(features)
     return scaled_features, labels
-
 
 X, y = preprocess_epica(df)
 label_encoder = LabelEncoder()
@@ -36,6 +42,20 @@ X_train, X_test, y_train, y_test = train_test_split(
 # -----------------------
 F_MIN = 0.86
 
+# Load saved best DecisionTree params (fallback to defaults if not found)
+dt_params = {"random_state": 42}
+try:
+    with open(JSON_PATH, "r") as f:
+        saved = json.load(f)
+    saved_params = saved.get("best_parameters", {})
+    valid = DecisionTreeClassifier().get_params().keys()
+    saved_params = {k: v for k, v in saved_params.items() if k in valid}
+    dt_params.update(saved_params)
+    print(f"\n🔧 Loaded DecisionTree params from '{JSON_PATH}':\n{dt_params}")
+except FileNotFoundError:
+    print(f"\nℹ️ '{JSON_PATH}' not found. Using default DecisionTree params:\n{dt_params}")
+except Exception as e:
+    print(f"\n⚠️ Could not load '{JSON_PATH}' ({e}). Using defaults:\n{dt_params}")
 
 # -----------------------
 # 3. Evaluation Functions
@@ -55,13 +75,11 @@ def evaluate_multiclass(y_true, y_pred, class_names):
         rec = TP / (TP + FN) if (TP + FN) > 0 else 0
         f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0
         metrics.append((cls, acc_cls, prec, rec, f1))
-        print(
-            f"{cls}: Accuracy={acc_cls:.4f}, Precision={prec:.4f}, Recall={rec:.4f}, F1={f1:.4f}, Support={np.sum(cm[i, :])}")
+        print(f"{cls}: Accuracy={acc_cls:.4f}, Precision={prec:.4f}, Recall={rec:.4f}, F1={f1:.4f}, Support={np.sum(cm[i, :])}")
     overall_acc = accuracy_score(y_true, y_pred)
     print(f"\nOverall Accuracy: {overall_acc:.4f}")
     passed = all(f1 >= F_MIN for (_, _, _, _, f1) in metrics)
     return overall_acc, metrics, passed
-
 
 def evaluate_binary(y_true, y_pred):
     cm = confusion_matrix(y_true, y_pred)
@@ -79,27 +97,40 @@ def evaluate_binary(y_true, y_pred):
         rec = TP / (TP + FN) if (TP + FN) > 0 else 0
         f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0
         metrics.append((cls, acc_cls, prec, rec, f1))
-        print(
-            f"{cls}: Accuracy={acc_cls:.4f}, Precision={prec:.4f}, Recall={rec:.4f}, F1={f1:.4f}, Support={np.sum(cm[i, :])}")
+        print(f"{cls}: Accuracy={acc_cls:.4f}, Precision={prec:.4f}, Recall={rec:.4f}, F1={f1:.4f}, Support={np.sum(cm[i, :])}")
     overall_acc = accuracy_score(y_true, y_pred)
     print(f"\nOverall Accuracy: {overall_acc:.4f}")
     passed = all(f1 >= F_MIN for (_, _, _, _, f1) in metrics)
     return overall_acc, metrics, passed
-
 
 def compute_cmr(y_labels):
     unique, counts = np.unique(y_labels, return_counts=True)
     avg = np.mean(counts)
     return {cls: cnt / avg for cls, cnt in zip(unique, counts)}
 
+# -----------------------
+# 4. Stages (architecture unchanged) + timing
+# -----------------------
+total_train_time = 0.0
+total_test_time  = 0.0
 
-# -----------------------
-# 4. Stage 1: Multi-class
-# -----------------------
 print("\n=== Stage 1: Decision Tree Multi-class ===")
-model_multi = DecisionTreeClassifier(random_state=42)
+model_multi = DecisionTreeClassifier(**dt_params)
+
+t0 = time.time()
 model_multi.fit(X_train, y_train)
+t1 = time.time()
 y_pred_multi = model_multi.predict(X_test)
+t2 = time.time()
+
+stage_train = t1 - t0
+stage_test  = t2 - t1
+total_train_time += stage_train
+total_test_time  += stage_test
+
+print(f"⏱ Stage 1 Training Time: {stage_train:.3f} s")
+print(f"⏱ Stage 1 Testing Time:  {stage_test:.5f} s")
+
 acc, metrics, passed = evaluate_multiclass(y_test, y_pred_multi, class_names)
 
 if passed:
@@ -107,36 +138,58 @@ if passed:
 else:
     print("❌ Stage 1 failed. Proceeding to Stage 2.")
 
-    # -----------------------
     # 5. Stage 2: Binary Normal vs Attack
-    # -----------------------
     normal_class = list(class_names).index('Normal')
     y_train_bin = (y_train != normal_class).astype(int)
-    y_test_bin = (y_test != normal_class).astype(int)
+    y_test_bin  = (y_test  != normal_class).astype(int)
 
-    model_bin = DecisionTreeClassifier(random_state=42)
+    model_bin = DecisionTreeClassifier(**dt_params)
+
+    t0 = time.time()
     model_bin.fit(X_train, y_train_bin)
+    t1 = time.time()
     y_pred_bin = model_bin.predict(X_test)
+    t2 = time.time()
+
+    stage_train = t1 - t0
+    stage_test  = t2 - t1
+    total_train_time += stage_train
+    total_test_time  += stage_test
+
+    print(f"⏱ Stage 2 Training Time: {stage_train:.3f} s")
+    print(f"⏱ Stage 2 Testing Time:  {stage_test:.5f} s")
+
     acc_bin, metrics_bin, passed_bin = evaluate_binary(y_test_bin, y_pred_bin)
 
     if passed_bin:
         print("✅ Stage 2 passed. Proceeding to Stage 3.")
 
-        # -----------------------
         # 6. Stage 3: Attack-only Multi-class
-        # -----------------------
         attack_mask_train = (y_train != normal_class)
-        attack_mask_test = (y_test != normal_class)
+        attack_mask_test  = (y_test  != normal_class)
         X_attack_train = X_train[attack_mask_train]
-        X_attack_test = X_test[attack_mask_test]
+        X_attack_test  = X_test[attack_mask_test]
         y_attack_train = y_train[attack_mask_train]
-        y_attack_test = y_test[attack_mask_test]
+        y_attack_test  = y_test[attack_mask_test]
         attack_classes = [c for c in class_names if c != 'Normal']
 
         print("\n=== Stage 3: Decision Tree Multi-class on Attacks ===")
-        model_attack = DecisionTreeClassifier(random_state=42)
+        model_attack = DecisionTreeClassifier(**dt_params)
+
+        t0 = time.time()
         model_attack.fit(X_attack_train, y_attack_train)
+        t1 = time.time()
         y_pred_attack = model_attack.predict(X_attack_test)
+        t2 = time.time()
+
+        stage_train = t1 - t0
+        stage_test  = t2 - t1
+        total_train_time += stage_train
+        total_test_time  += stage_test
+
+        print(f"⏱ Stage 3 Training Time: {stage_train:.3f} s")
+        print(f"⏱ Stage 3 Testing Time:  {stage_test:.5f} s")
+
         acc_att, metrics_att, passed_att = evaluate_multiclass(y_attack_test, y_pred_attack, attack_classes)
 
         if passed_att:
@@ -144,9 +197,7 @@ else:
         else:
             print("❌ Stage 3 failed. Proceeding to Stage 4.")
 
-            # -----------------------
             # 7. Stage 4: Recursive CMR-based Splitting
-            # -----------------------
             y_attack_train_idx = y_attack_train.copy()
             while len(np.unique(y_attack_train_idx)) > 2:
                 cmr_values = compute_cmr(y_attack_train_idx)
@@ -155,9 +206,22 @@ else:
                 print(f"\nRecursive step: Class with lowest CMR = {worst_class} ({cmr_values[worst_class_idx]:.3f})")
 
                 y_binary = (y_attack_train_idx == worst_class_idx).astype(int)
-                model_bin_rec = DecisionTreeClassifier(random_state=42)
+                model_bin_rec = DecisionTreeClassifier(**dt_params)
+
+                t0 = time.time()
                 model_bin_rec.fit(X_attack_train, y_binary)
+                t1 = time.time()
                 y_pred_b = model_bin_rec.predict(X_attack_train)
+                t2 = time.time()
+
+                stage_train = t1 - t0
+                stage_test  = t2 - t1
+                total_train_time += stage_train
+                total_test_time  += stage_test
+
+                print(f"⏱ Stage 4 (recursive) Train Time: {stage_train:.3f} s")
+                print(f"⏱ Stage 4 (recursive) Test Time:  {stage_test:.5f} s")
+
                 acc_b, metrics_b, passed_b = evaluate_binary(y_binary, y_pred_b)
 
                 if passed_b:
@@ -173,9 +237,30 @@ else:
             if len(np.unique(y_attack_train_idx)) == 2:
                 print("\nFinal binary classification for last two attack classes...")
                 y_binary_final = (y_attack_train_idx == np.unique(y_attack_train_idx)[0]).astype(int)
-                model_final = DecisionTreeClassifier(random_state=42)
+                model_final = DecisionTreeClassifier(**dt_params)
+
+                t0 = time.time()
                 model_final.fit(X_attack_train, y_binary_final)
+                t1 = time.time()
                 y_pred_final = model_final.predict(X_attack_train)
+                t2 = time.time()
+
+                stage_train = t1 - t0
+                stage_test  = t2 - t1
+                total_train_time += stage_train
+                total_test_time  += stage_test
+
+                print(f"⏱ Stage 4 (final) Train Time: {stage_train:.3f} s")
+                print(f"⏱ Stage 4 (final) Test Time:  {stage_test:.5f} s")
                 evaluate_binary(y_binary_final, y_pred_final)
     else:
         print("❌ Stage 2 failed. Cannot proceed further.")
+
+# -----------------------
+# 5. Total runtime summary
+# -----------------------
+print("\n" + "="*60)
+print("⏱ TOTAL RUNTIME SUMMARY (final fit/predict only)")
+print("="*60)
+print(f"Total Training Time: {total_train_time:.3f} s")
+print(f"Total Testing Time:  {total_test_time:.5f} s")

@@ -1,0 +1,17 @@
+{
+  "best_parameters": {
+    "C": 82.4431219090508,
+    "class_weight": "balanced",
+    "fit_intercept": true,
+    "max_iter": 1000,
+    "penalty": "l1",
+    "solver": "saga"
+  },
+  "best_cv_score": 0.6424476995087451,
+  "model_type": "LogisticRegression",
+  "class_names": [
+    "FDIA",
+    "Normal",
+    "TDA"
+  ]
+}

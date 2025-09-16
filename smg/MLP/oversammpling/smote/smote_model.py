@@ -11,7 +11,7 @@ from imblearn.over_sampling import SMOTE
 nm="SMOTE"
 
 # Load dataset
-df = pd.read_csv("../../../EPIC/dataset_EPICA_raw 1.csv")
+df = pd.read_csv("../../../../../EPIC/dataset_EPICA_raw 1.csv")
 
 
 # Preprocessing

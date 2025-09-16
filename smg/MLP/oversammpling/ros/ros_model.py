@@ -8,10 +8,10 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score
 from imblearn.over_sampling import RandomOverSampler
 
-nm="RandomOverSampler"
+nm = "RandomOverSampler"
 
 # Load dataset
-df = pd.read_csv("../../../EPIC/dataset_EPICA_raw 1.csv")
+df = pd.read_csv("../../../../EPIC/dataset_EPICA_raw 1.csv")
 
 
 # Preprocessing
@@ -24,6 +24,7 @@ def preprocess_epica(data):
     scaler = MinMaxScaler()
     scaled_features = scaler.fit_transform(features)
     return scaled_features, labels, features.columns.tolist()
+
 
 X, y, feature_names = preprocess_epica(df)
 
@@ -45,18 +46,15 @@ y_train_res_onehot = pd.get_dummies(y_train_res)
 input_dim = X_train_res.shape[1]
 output_dim = y_train_res_onehot.shape[1]
 
-
 params = {
-    "batch_size": 256,               # remains unchanged
-    "units1": 320,                   # updated from Dense(320)
-    "dropout1": 0.1,                 # updated from Dropout(0.1)
-    "units2": 224,                   # updated from Dense(224)
-    "dropout2": 0.1,                 # updated from Dropout(0.1)
-    "optimizer": "adam",            # remains unchanged
-    "lr": 0.0014267123289125915     # remains unchanged
+    "batch_size": 256,  # remains unchanged
+    "units1": 320,  # updated from Dense(320)
+    "dropout1": 0.1,  # updated from Dropout(0.1)
+    "units2": 224,  # updated from Dense(224)
+    "dropout2": 0.1,  # updated from Dropout(0.1)
+    "optimizer": "adam",  # remains unchanged
+    "lr": 0.0014267123289125915  # remains unchanged
 }
-
-
 
 
 def create_mlp(input_dim, output_dim):
@@ -68,14 +66,15 @@ def create_mlp(input_dim, output_dim):
         tf.keras.layers.Dropout(params["dropout2"]),
         tf.keras.layers.Dense(output_dim, activation='softmax')
     ])
-    optimizer=None
+    optimizer = None
 
-    if params["optimizer"] =="adam":
+    if params["optimizer"] == "adam":
         optimizer = tf.keras.optimizers.Adam(learning_rate=params["lr"])
     else:
         optimizer = tf.keras.optimizers.RMSprop(learning_rate=params["lr"])
     model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
     return model
+
 
 model = create_mlp(input_dim, output_dim)
 
@@ -135,7 +134,7 @@ report = classification_report(y_true, y_pred, target_names=class_labels, output
 print("\n=== Per-Class Metrics ===")
 for class_name in class_labels:
     metrics = report[class_name]
-    approx_acc = (metrics['recall'] * metrics['precision'])**0.5 * 100
+    approx_acc = (metrics['recall'] * metrics['precision']) ** 0.5 * 100
     print(f"\nClass: {class_name}")
     print(f"  Accuracy: {approx_acc:.2f}% (Approx)")
     print(f"  Precision: {metrics['precision'] * 100:.2f}%")

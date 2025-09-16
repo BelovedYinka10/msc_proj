@@ -10,5 +10,10 @@
     "class_weight": null
   },
   "best_cv_score": 0.8989392575416749,
-  "model_type": "DecisionTreeClassifier"
+  "model_type": "DecisionTreeClassifier",
+  "class_names": [
+    "FDIA",
+    "Normal",
+    "TDA"
+  ]
 }
