@@ -8,6 +8,7 @@ import json
 # Load dataset
 df = pd.read_csv("../../../EPIC/dataset_EPICA_raw 1.csv")
 
+
 # Preprocess
 def preprocess_epica(data):
     data = data.drop(columns=['Unnamed: 0', 'Unnamed: 0.1'], errors='ignore')
@@ -18,6 +19,7 @@ def preprocess_epica(data):
     scaler = MinMaxScaler()
     X = scaler.fit_transform(features)
     return X, labels
+
 
 X, y = preprocess_epica(df)
 

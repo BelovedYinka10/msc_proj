@@ -84,43 +84,36 @@ X_train, X_test, y_train_cat, y_test_cat, y_train_enc, y_test_enc, class_names =
     train_df, test_df, target_col
 )
 
-# ---------- Random Over Sampling (ROS) inserted here; structure unchanged ----------
+# ---------- ADASYN sampling (inserted here, structure unchanged) ----------
 print("\n" + "=" * 60)
-print("APPLYING RANDOM OVER SAMPLING (ROS) TO TRAINING SET")
+print("APPLYING ADASYN SAMPLING TO TRAINING SET")
 print("=" * 60)
 try:
-    from imblearn.over_sampling import RandomOverSampler
-    from collections import Counter
+    from imblearn.over_sampling import ADASYN
 
-    ros = RandomOverSampler(sampling_strategy='not majority', random_state=42)  # resample minority classes up to majority
-
+    ada = ADASYN(random_state=42, n_neighbors=5)
     # Show original class distribution
-    orig_counts = Counter(y_train_enc)
+    unique, counts = np.unique(y_train_enc, return_counts=True)
     print("Original training class distribution:")
-    for idx, name in enumerate(class_names):
-        print(f"  {name}: {orig_counts.get(idx, 0)}")
-
+    for u, c in zip(unique, counts):
+        print(f"  {class_names[u]}: {c}")
     # Fit-resample
-    X_train_res, y_train_res = ros.fit_resample(X_train, y_train_enc)
-
-    res_counts = Counter(y_train_res)
-    print("\nAfter ROS training class distribution:")
-    for idx, name in enumerate(class_names):
-        print(f"  {name}: {res_counts.get(idx, 0)}")
-
+    X_train_res, y_train_res = ada.fit_resample(X_train, y_train_enc)
+    unique_r, counts_r = np.unique(y_train_res, return_counts=True)
+    print("\nAfter ADASYN training class distribution:")
+    for u, c in zip(unique_r, counts_r):
+        print(f"  {class_names[u]}: {c}")
     # Convert resampled labels to categorical for Keras
     num_classes = len(class_names)
     y_train_res_cat = tf.keras.utils.to_categorical(y_train_res, num_classes)
-
     # Replace training inputs used for model.fit below
     X_train_used = X_train_res
     y_train_used_cat = y_train_res_cat
     y_train_used_enc = y_train_res
-
-    print("✅ Random Over Sampling applied successfully.")
+    print("✅ ADASYN sampling applied successfully.")
 except Exception as e:
-    print("⚠️ imbalanced-learn (imblearn) not available or RandomOverSampler failed:", e)
-    print("Proceeding WITHOUT ROS. The original training set will be used.")
+    print("⚠️ imbalanced-learn (imblearn) not available or ADASYN failed:", e)
+    print("Proceeding WITHOUT ADASYN. The original training set will be used.")
     X_train_used = X_train
     y_train_used_cat = y_train_cat
     y_train_used_enc = y_train_enc
@@ -361,7 +354,7 @@ results_summary = {
     "hyperparameters": best_hyperparams,
     "epochs_completed": len(history.history['accuracy']),
     "training_time_seconds": end_train - start_train,
-    "testing_time_seconds": end_test - test_start if 'test_start' in locals() else end_test - start_test,
+    "testing_time_seconds": end_test - start_test,
     "performance": {
         "accuracy": float(acc),
         "precision": float(prec),

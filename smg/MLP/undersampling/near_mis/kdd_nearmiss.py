@@ -84,27 +84,47 @@ X_train, X_test, y_train_cat, y_test_cat, y_train_enc, y_test_enc, class_names =
     train_df, test_df, target_col
 )
 
-# ---------- Random Over Sampling (ROS) inserted here; structure unchanged ----------
+# ---------- NearMiss undersampling (inserted here; structure unchanged) ----------
 print("\n" + "=" * 60)
-print("APPLYING RANDOM OVER SAMPLING (ROS) TO TRAINING SET")
+print("APPLYING NEARMISS UNDERSAMPLING TO TRAINING SET")
 print("=" * 60)
 try:
-    from imblearn.over_sampling import RandomOverSampler
+    from imblearn.under_sampling import NearMiss
     from collections import Counter
 
-    ros = RandomOverSampler(sampling_strategy='not majority', random_state=42)  # resample minority classes up to majority
+    # Fraction of the majority class to keep (0 < NM_FRACTION <= 1.0)
+    # Example: 0.5 keeps 50% of majority_count (reduces majority influence)
+    NM_FRACTION = 0.50
 
-    # Show original class distribution
+    # Compute original class counts
     orig_counts = Counter(y_train_enc)
-    print("Original training class distribution:")
+    majority_label, majority_count = max(orig_counts.items(), key=lambda kv: kv[1])
+
+    print(f"Original training class distribution (majority={class_names[majority_label]}: {majority_count}):")
     for idx, name in enumerate(class_names):
         print(f"  {name}: {orig_counts.get(idx, 0)}")
 
-    # Fit-resample
-    X_train_res, y_train_res = ros.fit_resample(X_train, y_train_enc)
+    # Determine target for majority class after undersampling:
+    # Keep at least as many as the largest minority to avoid collapsing below others.
+    max_minority = max(cnt for cls, cnt in orig_counts.items() if cls != majority_label)
+    nm_target_for_majority = max(max_minority, int(NM_FRACTION * majority_count))
+
+    # Build sampling_strategy dict for NearMiss: reduce majority to nm_target_for_majority, leave minorities unchanged
+    sampling_target = {}
+    for cls_idx, cnt in orig_counts.items():
+        sampling_target[cls_idx] = cnt if cls_idx != majority_label else nm_target_for_majority
+
+    print("\nNearMiss sampling targets (per-class):")
+    for idx, name in enumerate(class_names):
+        tgt = sampling_target.get(idx, 0)
+        print(f"  {name}: target -> {tgt}")
+
+    # Create NearMiss (version=1). It will select majority samples nearest to minority samples.
+    nm = NearMiss(sampling_strategy=sampling_target, version=1, n_neighbors=3)
+    X_train_res, y_train_res = nm.fit_resample(X_train, y_train_enc)
 
     res_counts = Counter(y_train_res)
-    print("\nAfter ROS training class distribution:")
+    print("\nAfter NearMiss training class distribution:")
     for idx, name in enumerate(class_names):
         print(f"  {name}: {res_counts.get(idx, 0)}")
 
@@ -117,15 +137,15 @@ try:
     y_train_used_cat = y_train_res_cat
     y_train_used_enc = y_train_res
 
-    print("✅ Random Over Sampling applied successfully.")
+    print("✅ NearMiss undersampling applied successfully.")
 except Exception as e:
-    print("⚠️ imbalanced-learn (imblearn) not available or RandomOverSampler failed:", e)
-    print("Proceeding WITHOUT ROS. The original training set will be used.")
+    print("⚠️ imbalanced-learn (imblearn) not available or NearMiss failed:", e)
+    print("Proceeding WITHOUT NearMiss. The original training set will be used.")
     X_train_used = X_train
     y_train_used_cat = y_train_cat
     y_train_used_enc = y_train_enc
 
-# Best hyperparameters from your Hyperband results
+# ---------- Best hyperparameters from your Hyperband results ----------
 print(f"\n" + "=" * 50)
 print("BEST HYPERBAND HYPERPARAMETERS")
 print("=" * 50)
@@ -227,8 +247,8 @@ end_train = time.time()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
 # Accuracy plot
-ax1.plot(history.history['accuracy'], label='Train Accuracy', linewidth=2.5, color='blue')
-ax1.plot(history.history['val_accuracy'], label='Validation Accuracy', linewidth=2.5, color='red')
+ax1.plot(history.history['accuracy'], label='Train Accuracy', linewidth=2.5)
+ax1.plot(history.history['val_accuracy'], label='Validation Accuracy', linewidth=2.5)
 ax1.set_title('Training & Validation Accuracy', fontsize=14, fontweight='bold')
 ax1.set_xlabel('Epoch')
 ax1.set_ylabel('Accuracy')
@@ -236,8 +256,8 @@ ax1.legend()
 ax1.grid(True, alpha=0.3)
 
 # Loss plot
-ax2.plot(history.history['loss'], label='Train Loss', linewidth=2.5, color='blue')
-ax2.plot(history.history['val_loss'], label='Validation Loss', linewidth=2.5, color='red')
+ax2.plot(history.history['loss'], label='Train Loss', linewidth=2.5)
+ax2.plot(history.history['val_loss'], label='Validation Loss', linewidth=2.5)
 ax2.set_title('Training & Validation Loss', fontsize=14, fontweight='bold')
 ax2.set_xlabel('Epoch')
 ax2.set_ylabel('Loss')
@@ -361,7 +381,7 @@ results_summary = {
     "hyperparameters": best_hyperparams,
     "epochs_completed": len(history.history['accuracy']),
     "training_time_seconds": end_train - start_train,
-    "testing_time_seconds": end_test - test_start if 'test_start' in locals() else end_test - start_test,
+    "testing_time_seconds": end_test - start_test,
     "performance": {
         "accuracy": float(acc),
         "precision": float(prec),

@@ -14,15 +14,15 @@ from sklearn.metrics import confusion_matrix
 TRAIN_PATH = "/Users/mac/Desktop/machine learning/KDD/KDDTrain+_5class.csv"
 TEST_PATH = "/Users/mac/Desktop/machine learning//KDD/KDDTest+_5class.csv"
 
-print("=" * 70)
+print("="*70)
 print("KDD MODEL WITH BEST HYPERBAND HYPERPARAMETERS")
-print("=" * 70)
+print("="*70)
 print("🎯 USING EXACT OPTIMAL HYPERPARAMETERS")
 print("✅ Architecture: 224 units (tanh) → 480 units (relu)")
-print("✅ Learning Rate: 0.00030418 (Adam optimizer)")
+print("✅ Learning Rate: 0.00030418 (Adam optimizer)")  
 print("✅ Batch Size: 32")
 print("✅ Simple training - no complications!")
-print("=" * 70)
+print("="*70)
 
 # Load datasets
 print("Loading KDD 5-class datasets...")
@@ -36,17 +36,16 @@ print(f"Test data shape: {test_df.shape}")
 target_col = train_df.columns[-1]
 print(f"Target column: {target_col}")
 
-
 # Preprocessing function
 def preprocess_kdd_5class(train_data, test_data, target_col):
     """Preprocess KDD 5-class data"""
     print("\nPreprocessing data...")
-
+    
     X_train = train_data.drop(columns=[target_col])
     y_train = train_data[target_col]
     X_test = test_data.drop(columns=[target_col])
     y_test = test_data[target_col]
-
+    
     # Handle categorical features
     categorical_columns = X_train.select_dtypes(include=['object']).columns.tolist()
     if categorical_columns:
@@ -57,89 +56,47 @@ def preprocess_kdd_5class(train_data, test_data, target_col):
             le.fit(combined_col.astype(str))
             X_train[col] = le.transform(X_train[col].astype(str))
             X_test[col] = le.transform(X_test[col].astype(str))
-
+    
     # Scale features
     scaler = MinMaxScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
-
+    
     # Encode target labels
     label_encoder = LabelEncoder()
     y_train_encoded = label_encoder.fit_transform(y_train)
     y_test_encoded = label_encoder.transform(y_test)
-
+    
     # Convert to categorical
     num_classes = len(label_encoder.classes_)
     y_train_categorical = tf.keras.utils.to_categorical(y_train_encoded, num_classes)
     y_test_categorical = tf.keras.utils.to_categorical(y_test_encoded, num_classes)
-
+    
     print(f"Classes: {label_encoder.classes_}")
-
-    return (X_train_scaled, X_test_scaled, y_train_categorical, y_test_categorical,
+    
+    return (X_train_scaled, X_test_scaled, y_train_categorical, y_test_categorical, 
             y_train_encoded, y_test_encoded, label_encoder.classes_)
-
 
 # Preprocess data
 X_train, X_test, y_train_cat, y_test_cat, y_train_enc, y_test_enc, class_names = preprocess_kdd_5class(
     train_df, test_df, target_col
 )
 
-# ---------- Random Over Sampling (ROS) inserted here; structure unchanged ----------
-print("\n" + "=" * 60)
-print("APPLYING RANDOM OVER SAMPLING (ROS) TO TRAINING SET")
-print("=" * 60)
-try:
-    from imblearn.over_sampling import RandomOverSampler
-    from collections import Counter
-
-    ros = RandomOverSampler(sampling_strategy='not majority', random_state=42)  # resample minority classes up to majority
-
-    # Show original class distribution
-    orig_counts = Counter(y_train_enc)
-    print("Original training class distribution:")
-    for idx, name in enumerate(class_names):
-        print(f"  {name}: {orig_counts.get(idx, 0)}")
-
-    # Fit-resample
-    X_train_res, y_train_res = ros.fit_resample(X_train, y_train_enc)
-
-    res_counts = Counter(y_train_res)
-    print("\nAfter ROS training class distribution:")
-    for idx, name in enumerate(class_names):
-        print(f"  {name}: {res_counts.get(idx, 0)}")
-
-    # Convert resampled labels to categorical for Keras
-    num_classes = len(class_names)
-    y_train_res_cat = tf.keras.utils.to_categorical(y_train_res, num_classes)
-
-    # Replace training inputs used for model.fit below
-    X_train_used = X_train_res
-    y_train_used_cat = y_train_res_cat
-    y_train_used_enc = y_train_res
-
-    print("✅ Random Over Sampling applied successfully.")
-except Exception as e:
-    print("⚠️ imbalanced-learn (imblearn) not available or RandomOverSampler failed:", e)
-    print("Proceeding WITHOUT ROS. The original training set will be used.")
-    X_train_used = X_train
-    y_train_used_cat = y_train_cat
-    y_train_used_enc = y_train_enc
-
 # Best hyperparameters from your Hyperband results
-print(f"\n" + "=" * 50)
+print(f"\n" + "="*50)
 print("BEST HYPERBAND HYPERPARAMETERS")
-print("=" * 50)
+print("="*50)
 
 best_hyperparams = {
     "num_layers": 2,
     "units_0": 224,
-    "activation_0": "tanh",
+    "activation_0": "tanh", 
     "kernel_init": "he_normal",
     "batch_norm_0": True,
     "dropout_0": 0.0,
     "units_1": 480,
     "activation_1": "relu",
-    "batch_norm_1": True,
+    "batch_norm_1": True, 
     "dropout_1": 0.1,
     "optimizer": "adam",
     "learning_rate": 0.00030418
@@ -157,26 +114,25 @@ print(f"├── Optimizer: {best_hyperparams['optimizer']}")
 print(f"├── Learning Rate: {best_hyperparams['learning_rate']:.6f}")
 print(f"└── Kernel Initializer: {best_hyperparams['kernel_init']}")
 
-
 # Create model with best hyperparameters
 def create_optimal_model(input_dim, num_classes):
     """Create model using best Hyperband hyperparameters"""
-
+    
     model = tf.keras.Sequential()
-
+    
     # Input layer
     model.add(tf.keras.layers.Input(shape=(input_dim,)))
-
+    
     # Layer 1: 224 units, tanh activation
     model.add(tf.keras.layers.Dense(
-        224,
+        224, 
         activation='tanh',
         kernel_initializer='he_normal'
     ))
     model.add(tf.keras.layers.BatchNormalization())
     # No dropout for layer 1 (dropout_0 = 0.0)
-
-    # Layer 2: 480 units, relu activation
+    
+    # Layer 2: 480 units, relu activation  
     model.add(tf.keras.layers.Dense(
         480,
         activation='relu',
@@ -184,28 +140,27 @@ def create_optimal_model(input_dim, num_classes):
     ))
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.1))
-
+    
     # Output layer
     model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
-
+    
     # Compile with optimal settings
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.00030418)
-
+    
     model.compile(
         optimizer=optimizer,
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
-
+    
     return model
 
-
 # Create and train the model
-print(f"\n" + "=" * 50)
+print(f"\n" + "="*50)
 print("BUILDING AND TRAINING MODEL")
-print("=" * 50)
+print("="*50)
 
-model = create_optimal_model(X_train_used.shape[1], len(class_names))
+model = create_optimal_model(X_train.shape[1], len(class_names))
 model.summary()
 
 # Train the model - simple and straightforward
@@ -214,7 +169,7 @@ print(f"\n--- Training Model with Optimal Hyperparameters ---")
 start_train = time.time()
 
 history = model.fit(
-    X_train_used, y_train_used_cat,
+    X_train, y_train_cat,
     epochs=20,  # Reasonable number of epochs
     batch_size=32,  # Standard batch size
     validation_split=0.15,
@@ -248,9 +203,9 @@ plt.tight_layout()
 plt.show()
 
 # Final evaluation
-print(f"\n" + "=" * 50)
+print(f"\n" + "="*50)
 print("FINAL EVALUATION")
-print("=" * 50)
+print("="*50)
 
 start_test = time.time()
 y_pred_probs = model.predict(X_test, verbose=0)
@@ -279,9 +234,9 @@ cm = confusion_matrix(y_test_enc, y_pred)
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 7))
 
 # Raw counts
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
             xticklabels=class_names, yticklabels=class_names,
-            ax=ax1, cbar_kws={'label': 'Count'},
+            ax=ax1, cbar_kws={'label': 'Count'}, 
             annot_kws={'size': 12, 'weight': 'bold'})
 ax1.set_title('Confusion Matrix (Counts)', fontsize=16, fontweight='bold')
 ax1.set_xlabel('Predicted Label', fontsize=12)
@@ -301,12 +256,12 @@ plt.tight_layout()
 plt.show()
 
 # Per-class analysis WITH class-wise accuracy
-report = classification_report(y_test_enc, y_pred, target_names=class_names,
-                               output_dict=True, zero_division=0)
+report = classification_report(y_test_enc, y_pred, target_names=class_names, 
+                             output_dict=True, zero_division=0)
 
-print(f"\n" + "=" * 80)
+print(f"\n" + "="*80)
 print("DETAILED PERFORMANCE ANALYSIS (WITH CLASS-WISE ACCURACY)")
-print("=" * 80)
+print("="*80)
 
 # Calculate class-wise accuracy from confusion matrix
 class_accuracies = cm.diagonal() / cm.sum(axis=1)
@@ -316,10 +271,10 @@ for i, class_name in enumerate(class_names):
     metrics = report[class_name]
     class_performance.append({
         'Class': class_name,
-        'Accuracy': f"{class_accuracies[i] * 100:.2f}%",  # Added class-wise accuracy
-        'Precision': f"{metrics['precision'] * 100:.2f}%",
-        'Recall': f"{metrics['recall'] * 100:.2f}%",
-        'F1-Score': f"{metrics['f1-score'] * 100:.2f}%",
+        'Accuracy': f"{class_accuracies[i]*100:.2f}%",  # Added class-wise accuracy
+        'Precision': f"{metrics['precision']*100:.2f}%",
+        'Recall': f"{metrics['recall']*100:.2f}%", 
+        'F1-Score': f"{metrics['f1-score']*100:.2f}%",
         'Support': int(metrics['support'])
     })
 
@@ -327,12 +282,12 @@ df_performance = pd.DataFrame(class_performance)
 print(df_performance.to_string(index=False))
 
 # Additional class-wise accuracy section
-print(f"\n" + "=" * 50)
+print(f"\n" + "="*50)
 print("CLASS-WISE ACCURACY BREAKDOWN")
-print("=" * 50)
+print("="*50)
 
 for i, class_name in enumerate(class_names):
-    print(f"{class_name:<15}: {class_accuracies[i] * 100:6.2f}%")
+    print(f"{class_name:<15}: {class_accuracies[i]*100:6.2f}%")
 
 # Attack detection performance
 y_test_binary = (y_test_enc != 0).astype(int)  # Normal vs Attack
@@ -343,9 +298,9 @@ binary_prec = precision_score(y_test_binary, y_pred_binary, zero_division=0)
 binary_rec = recall_score(y_test_binary, y_pred_binary, zero_division=0)
 binary_f1 = f1_score(y_test_binary, y_pred_binary, zero_division=0)
 
-print(f"\n" + "=" * 50)
+print(f"\n" + "="*50)
 print("ATTACK DETECTION PERFORMANCE")
-print("=" * 50)
+print("="*50)
 print(f"Normal vs Attack Classification:")
 print(f"├── Accuracy:  {binary_acc * 100:.2f}%")
 print(f"├── Precision: {binary_prec * 100:.2f}%")
@@ -361,10 +316,10 @@ results_summary = {
     "hyperparameters": best_hyperparams,
     "epochs_completed": len(history.history['accuracy']),
     "training_time_seconds": end_train - start_train,
-    "testing_time_seconds": end_test - test_start if 'test_start' in locals() else end_test - start_test,
+    "testing_time_seconds": end_test - start_test,
     "performance": {
         "accuracy": float(acc),
-        "precision": float(prec),
+        "precision": float(prec), 
         "recall": float(rec),
         "f1_score": float(f1)
     },
@@ -374,7 +329,7 @@ results_summary = {
     "attack_detection": {
         "binary_accuracy": float(binary_acc),
         "binary_precision": float(binary_prec),
-        "binary_recall": float(binary_rec),
+        "binary_recall": float(binary_rec), 
         "binary_f1": float(binary_f1)
     }
 }
@@ -382,10 +337,10 @@ results_summary = {
 with open("optimal_model_results.json", 'w') as f:
     json.dump(results_summary, f, indent=4)
 
-print(f"\n" + "=" * 60)
+print(f"\n" + "="*60)
 print("✅ MODEL TRAINING COMPLETE!")
-print("=" * 60)
-print(f"🎯 Final Accuracy: {acc * 100:.2f}%")
+print("="*60)
+print(f"🎯 Final Accuracy: {acc*100:.2f}%")
 print("📁 Model saved as: kdd_optimal_model.keras")
 print("📁 Results saved as: optimal_model_results.json")
 print("✅ Class-wise accuracy included in detailed analysis!")

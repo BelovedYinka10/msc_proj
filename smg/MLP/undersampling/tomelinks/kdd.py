@@ -84,15 +84,13 @@ X_train, X_test, y_train_cat, y_test_cat, y_train_enc, y_test_enc, class_names =
     train_df, test_df, target_col
 )
 
-# ---------- Random Over Sampling (ROS) inserted here; structure unchanged ----------
+# ---------- Tomek Links cleaning (inserted here; structure unchanged) ----------
 print("\n" + "=" * 60)
-print("APPLYING RANDOM OVER SAMPLING (ROS) TO TRAINING SET")
+print("APPLYING TOMEK LINKS CLEANING TO TRAINING SET")
 print("=" * 60)
 try:
-    from imblearn.over_sampling import RandomOverSampler
+    from imblearn.under_sampling import TomekLinks
     from collections import Counter
-
-    ros = RandomOverSampler(sampling_strategy='not majority', random_state=42)  # resample minority classes up to majority
 
     # Show original class distribution
     orig_counts = Counter(y_train_enc)
@@ -100,11 +98,14 @@ try:
     for idx, name in enumerate(class_names):
         print(f"  {name}: {orig_counts.get(idx, 0)}")
 
-    # Fit-resample
-    X_train_res, y_train_res = ros.fit_resample(X_train, y_train_enc)
+    # Create and apply TomekLinks (default sampling_strategy='auto')
+    # TomekLinks will remove majority examples that form Tomek links with minority examples,
+    # helping to clean borderline/overlapping examples.
+    tl = TomekLinks(sampling_strategy='auto', n_jobs=-1)
+    X_train_res, y_train_res = tl.fit_resample(X_train, y_train_enc)
 
     res_counts = Counter(y_train_res)
-    print("\nAfter ROS training class distribution:")
+    print("\nAfter TomekLinks training class distribution:")
     for idx, name in enumerate(class_names):
         print(f"  {name}: {res_counts.get(idx, 0)}")
 
@@ -117,10 +118,10 @@ try:
     y_train_used_cat = y_train_res_cat
     y_train_used_enc = y_train_res
 
-    print("✅ Random Over Sampling applied successfully.")
+    print("✅ TomekLinks cleaning applied successfully.")
 except Exception as e:
-    print("⚠️ imbalanced-learn (imblearn) not available or RandomOverSampler failed:", e)
-    print("Proceeding WITHOUT ROS. The original training set will be used.")
+    print("⚠️ imbalanced-learn (imblearn) not available or TomekLinks failed:", e)
+    print("Proceeding WITHOUT TomekLinks. The original training set will be used.")
     X_train_used = X_train
     y_train_used_cat = y_train_cat
     y_train_used_enc = y_train_enc
@@ -227,8 +228,8 @@ end_train = time.time()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
 # Accuracy plot
-ax1.plot(history.history['accuracy'], label='Train Accuracy', linewidth=2.5, color='blue')
-ax1.plot(history.history['val_accuracy'], label='Validation Accuracy', linewidth=2.5, color='red')
+ax1.plot(history.history['accuracy'], label='Train Accuracy', linewidth=2.5)
+ax1.plot(history.history['val_accuracy'], label='Validation Accuracy', linewidth=2.5)
 ax1.set_title('Training & Validation Accuracy', fontsize=14, fontweight='bold')
 ax1.set_xlabel('Epoch')
 ax1.set_ylabel('Accuracy')
@@ -236,8 +237,8 @@ ax1.legend()
 ax1.grid(True, alpha=0.3)
 
 # Loss plot
-ax2.plot(history.history['loss'], label='Train Loss', linewidth=2.5, color='blue')
-ax2.plot(history.history['val_loss'], label='Validation Loss', linewidth=2.5, color='red')
+ax2.plot(history.history['loss'], label='Train Loss', linewidth=2.5)
+ax2.plot(history.history['val_loss'], label='Validation Loss', linewidth=2.5)
 ax2.set_title('Training & Validation Loss', fontsize=14, fontweight='bold')
 ax2.set_xlabel('Epoch')
 ax2.set_ylabel('Loss')
@@ -361,7 +362,7 @@ results_summary = {
     "hyperparameters": best_hyperparams,
     "epochs_completed": len(history.history['accuracy']),
     "training_time_seconds": end_train - start_train,
-    "testing_time_seconds": end_test - test_start if 'test_start' in locals() else end_test - start_test,
+    "testing_time_seconds": end_test - start_test,
     "performance": {
         "accuracy": float(acc),
         "precision": float(prec),
