@@ -6,149 +6,140 @@ import seaborn as sns
 import time
 import json
 from datetime import datetime
+from collections import Counter
+
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import (
+    classification_report, accuracy_score, precision_score, recall_score, f1_score,
+    confusion_matrix, roc_auc_score, average_precision_score
+)
 
+# NEW: NearMiss under-sampler
+from imblearn.under_sampling import NearMiss
+
+# ================================
 # File paths for 5-class KDD dataset
+# ================================
 TRAIN_PATH = "/Users/mac/Desktop/machine learning/KDD/KDDTrain+_5class.csv"
-TEST_PATH = "/Users/mac/Desktop/machine learning//KDD/KDDTest+_5class.csv"
+TEST_PATH  = "/Users/mac/Desktop/machine learning//KDD/KDDTest+_5class.csv"
 
-print("=" * 70)
-print("KDD MODEL WITH BEST HYPERBAND HYPERPARAMETERS")
-print("=" * 70)
+print("="*70)
+print("KDD MODEL WITH BEST HYPERBAND HYPERPARAMETERS + NEARMISS (UNDER-SAMPLING)")
+print("="*70)
 print("🎯 USING EXACT OPTIMAL HYPERPARAMETERS")
 print("✅ Architecture: 224 units (tanh) → 480 units (relu)")
 print("✅ Learning Rate: 0.00030418 (Adam optimizer)")
 print("✅ Batch Size: 32")
-print("✅ Simple training - no complications!")
-print("=" * 70)
+print("✅ Under-sampling: NearMiss on TRAIN only")
+print("="*70)
 
+# ================================
 # Load datasets
+# ================================
 print("Loading KDD 5-class datasets...")
 train_df = pd.read_csv(TRAIN_PATH)
-test_df = pd.read_csv(TEST_PATH)
+test_df  = pd.read_csv(TEST_PATH)
 
 print(f"Train data shape: {train_df.shape}")
-print(f"Test data shape: {test_df.shape}")
+print(f"Test  data shape: {test_df.shape}")
 
-# Get target column
+# Target column (assumes last col is class label)
 target_col = train_df.columns[-1]
 print(f"Target column: {target_col}")
 
-
-# Preprocessing function
+# ================================
+# Preprocessing
+# ================================
 def preprocess_kdd_5class(train_data, test_data, target_col):
-    """Preprocess KDD 5-class data"""
+    """
+    Preprocess KDD 5-class data:
+      - Label-encode categorical feature columns (shared fit on train+test categories)
+      - MinMax scale features
+      - Label-encode targets + one-hot for Keras
+    """
     print("\nPreprocessing data...")
+    X_train = train_data.drop(columns=[target_col]).copy()
+    y_train = train_data[target_col].copy()
+    X_test  = test_data.drop(columns=[target_col]).copy()
+    y_test  = test_data[target_col].copy()
 
-    X_train = train_data.drop(columns=[target_col])
-    y_train = train_data[target_col]
-    X_test = test_data.drop(columns=[target_col])
-    y_test = test_data[target_col]
-
-    # Handle categorical features
+    # Encode categorical columns with LabelEncoder (simple & fast)
     categorical_columns = X_train.select_dtypes(include=['object']).columns.tolist()
     if categorical_columns:
         print(f"Encoding categorical columns: {categorical_columns}")
         for col in categorical_columns:
-            le = LabelEncoder()
-            combined_col = pd.concat([X_train[col], X_test[col]], axis=0)
-            le.fit(combined_col.astype(str))
-            X_train[col] = le.transform(X_train[col].astype(str))
-            X_test[col] = le.transform(X_test[col].astype(str))
+            le_col = LabelEncoder()
+            combined = pd.concat([X_train[col], X_test[col]], axis=0)
+            le_col.fit(combined.astype(str))
+            X_train[col] = le_col.transform(X_train[col].astype(str))
+            X_test[col]  = le_col.transform(X_test[col].astype(str))
 
     # Scale features
     scaler = MinMaxScaler()
     X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_test_scaled  = scaler.transform(X_test)
 
-    # Encode target labels
-    label_encoder = LabelEncoder()
+    # Encode labels
+    label_encoder   = LabelEncoder()
     y_train_encoded = label_encoder.fit_transform(y_train)
-    y_test_encoded = label_encoder.transform(y_test)
+    y_test_encoded  = label_encoder.transform(y_test)
 
-    # Convert to categorical
-    num_classes = len(label_encoder.classes_)
+    # One-hot for Keras
+    num_classes         = len(label_encoder.classes_)
     y_train_categorical = tf.keras.utils.to_categorical(y_train_encoded, num_classes)
-    y_test_categorical = tf.keras.utils.to_categorical(y_test_encoded, num_classes)
+    y_test_categorical  = tf.keras.utils.to_categorical(y_test_encoded, num_classes)
 
     print(f"Classes: {label_encoder.classes_}")
 
-    return (X_train_scaled, X_test_scaled, y_train_categorical, y_test_categorical,
-            y_train_encoded, y_test_encoded, label_encoder.classes_)
+    return (X_train_scaled, X_test_scaled,
+            y_train_categorical, y_test_categorical,
+            y_train_encoded, y_test_encoded,
+            label_encoder.classes_)
 
-
-# Preprocess data
+# Run preprocessing
 X_train, X_test, y_train_cat, y_test_cat, y_train_enc, y_test_enc, class_names = preprocess_kdd_5class(
     train_df, test_df, target_col
 )
 
-# ---------- NearMiss undersampling (inserted here; structure unchanged) ----------
-print("\n" + "=" * 60)
-print("APPLYING NEARMISS UNDERSAMPLING TO TRAINING SET")
-print("=" * 60)
-try:
-    from imblearn.under_sampling import NearMiss
-    from collections import Counter
+# ================================
+# NearMiss under-sampling (TRAIN ONLY)
+# ================================
+print("\n" + "="*50)
+print("NEARMISS UNDER-SAMPLING (training set only)")
+print("="*50)
 
-    # Fraction of the majority class to keep (0 < NM_FRACTION <= 1.0)
-    # Example: 0.5 keeps 50% of majority_count (reduces majority influence)
-    NM_FRACTION = 0.50
+counts_before = Counter(y_train_enc)
+print("Class counts BEFORE NearMiss:", {class_names[k]: v for k, v in counts_before.items()})
 
-    # Compute original class counts
-    orig_counts = Counter(y_train_enc)
-    majority_label, majority_count = max(orig_counts.items(), key=lambda kv: kv[1])
+min_class_count = min(counts_before.values())
+print(f"Minority class size = {min_class_count} → NearMiss will reduce majority classes to this size.")
 
-    print(f"Original training class distribution (majority={class_names[majority_label]}: {majority_count}):")
-    for idx, name in enumerate(class_names):
-        print(f"  {name}: {orig_counts.get(idx, 0)}")
+# version=1: keep majority samples closest to minority (most commonly used)
+# You can try version=2 or 3 if you’d like different neighbor logic.
+nm = NearMiss(version=1)  # sampling_strategy='auto' → down to minority count
+t_us0 = time.time()
+X_train_nm, y_train_nm = nm.fit_resample(X_train, y_train_enc)
+t_us1 = time.time()
 
-    # Determine target for majority class after undersampling:
-    # Keep at least as many as the largest minority to avoid collapsing below others.
-    max_minority = max(cnt for cls, cnt in orig_counts.items() if cls != majority_label)
-    nm_target_for_majority = max(max_minority, int(NM_FRACTION * majority_count))
+print(f"NearMiss time: {t_us1 - t_us0:.2f}s")
+counts_after = Counter(y_train_nm)
+print("Class counts AFTER  NearMiss:", {class_names[k]: v for k, v in counts_after.items()})
+print(f"Training samples after NearMiss: {X_train_nm.shape[0]} (down from {X_train.shape[0]})")
 
-    # Build sampling_strategy dict for NearMiss: reduce majority to nm_target_for_majority, leave minorities unchanged
-    sampling_target = {}
-    for cls_idx, cnt in orig_counts.items():
-        sampling_target[cls_idx] = cnt if cls_idx != majority_label else nm_target_for_majority
+num_classes = len(class_names)
+y_train_nm_cat = tf.keras.utils.to_categorical(y_train_nm, num_classes)
 
-    print("\nNearMiss sampling targets (per-class):")
-    for idx, name in enumerate(class_names):
-        tgt = sampling_target.get(idx, 0)
-        print(f"  {name}: target -> {tgt}")
+# Guard: if downsampled set is tiny, skip validation split to avoid errors
+val_split = 0.15 if X_train_nm.shape[0] >= 200 else 0.0
+if val_split == 0.0:
+    print("⚠️ Very small training set after NearMiss → using validation_split=0.0")
 
-    # Create NearMiss (version=1). It will select majority samples nearest to minority samples.
-    nm = NearMiss(sampling_strategy=sampling_target, version=1, n_neighbors=3)
-    X_train_res, y_train_res = nm.fit_resample(X_train, y_train_enc)
-
-    res_counts = Counter(y_train_res)
-    print("\nAfter NearMiss training class distribution:")
-    for idx, name in enumerate(class_names):
-        print(f"  {name}: {res_counts.get(idx, 0)}")
-
-    # Convert resampled labels to categorical for Keras
-    num_classes = len(class_names)
-    y_train_res_cat = tf.keras.utils.to_categorical(y_train_res, num_classes)
-
-    # Replace training inputs used for model.fit below
-    X_train_used = X_train_res
-    y_train_used_cat = y_train_res_cat
-    y_train_used_enc = y_train_res
-
-    print("✅ NearMiss undersampling applied successfully.")
-except Exception as e:
-    print("⚠️ imbalanced-learn (imblearn) not available or NearMiss failed:", e)
-    print("Proceeding WITHOUT NearMiss. The original training set will be used.")
-    X_train_used = X_train
-    y_train_used_cat = y_train_cat
-    y_train_used_enc = y_train_enc
-
-# ---------- Best hyperparameters from your Hyperband results ----------
-print(f"\n" + "=" * 50)
+# ================================
+# Best hyperparameters (from Hyperband)
+# ================================
+print("\n" + "="*50)
 print("BEST HYPERBAND HYPERPARAMETERS")
-print("=" * 50)
+print("="*50)
 
 best_hyperparams = {
     "num_layers": 2,
@@ -177,235 +168,287 @@ print(f"├── Optimizer: {best_hyperparams['optimizer']}")
 print(f"├── Learning Rate: {best_hyperparams['learning_rate']:.6f}")
 print(f"└── Kernel Initializer: {best_hyperparams['kernel_init']}")
 
-
-# Create model with best hyperparameters
+# ================================
+# Model definition
+# ================================
 def create_optimal_model(input_dim, num_classes):
-    """Create model using best Hyperband hyperparameters"""
-
+    """Create model using best Hyperband hyperparameters."""
     model = tf.keras.Sequential()
-
-    # Input layer
     model.add(tf.keras.layers.Input(shape=(input_dim,)))
 
-    # Layer 1: 224 units, tanh activation
-    model.add(tf.keras.layers.Dense(
-        224,
-        activation='tanh',
-        kernel_initializer='he_normal'
-    ))
+    # Layer 1
+    model.add(tf.keras.layers.Dense(224, activation='tanh', kernel_initializer='he_normal'))
     model.add(tf.keras.layers.BatchNormalization())
-    # No dropout for layer 1 (dropout_0 = 0.0)
 
-    # Layer 2: 480 units, relu activation
-    model.add(tf.keras.layers.Dense(
-        480,
-        activation='relu',
-        kernel_initializer='he_normal'
-    ))
+    # Layer 2
+    model.add(tf.keras.layers.Dense(480, activation='relu', kernel_initializer='he_normal'))
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.1))
 
-    # Output layer
+    # Output
     model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
-    # Compile with optimal settings
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.00030418)
-
-    model.compile(
-        optimizer=optimizer,
-        loss='categorical_crossentropy',
-        metrics=['accuracy']
-    )
-
+    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
+# ================================
+# Train
+# ================================
+print("\n" + "="*50)
+print("BUILDING AND TRAINING MODEL (NearMiss)")
+print("="*50)
 
-# Create and train the model
-print(f"\n" + "=" * 50)
-print("BUILDING AND TRAINING MODEL")
-print("=" * 50)
-
-model = create_optimal_model(X_train_used.shape[1], len(class_names))
+model = create_optimal_model(X_train_nm.shape[1], len(class_names))
 model.summary()
 
-# Train the model - simple and straightforward
-print(f"\n--- Training Model with Optimal Hyperparameters ---")
-
+print("\n--- Training Model with Optimal Hyperparameters + NearMiss ---")
 start_train = time.time()
-
 history = model.fit(
-    X_train_used, y_train_used_cat,
-    epochs=20,  # Reasonable number of epochs
-    batch_size=32,  # Standard batch size
-    validation_split=0.15,
+    X_train_nm, y_train_nm_cat,
+    epochs=20,
+    batch_size=32,
+    validation_split=val_split,
     verbose=1
 )
-
 end_train = time.time()
 
-# Training visualization
+# ================================
+# Training curves
+# ================================
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
-# Accuracy plot
 ax1.plot(history.history['accuracy'], label='Train Accuracy', linewidth=2.5)
-ax1.plot(history.history['val_accuracy'], label='Validation Accuracy', linewidth=2.5)
-ax1.set_title('Training & Validation Accuracy', fontsize=14, fontweight='bold')
-ax1.set_xlabel('Epoch')
-ax1.set_ylabel('Accuracy')
-ax1.legend()
-ax1.grid(True, alpha=0.3)
+if 'val_accuracy' in history.history:
+    ax1.plot(history.history['val_accuracy'], label='Validation Accuracy', linewidth=2.5)
+ax1.set_title('Training & Validation Accuracy')
+ax1.set_xlabel('Epoch'); ax1.set_ylabel('Accuracy'); ax1.legend(); ax1.grid(True, alpha=0.3)
 
-# Loss plot
 ax2.plot(history.history['loss'], label='Train Loss', linewidth=2.5)
-ax2.plot(history.history['val_loss'], label='Validation Loss', linewidth=2.5)
-ax2.set_title('Training & Validation Loss', fontsize=14, fontweight='bold')
-ax2.set_xlabel('Epoch')
-ax2.set_ylabel('Loss')
-ax2.legend()
-ax2.grid(True, alpha=0.3)
+if 'val_loss' in history.history:
+    ax2.plot(history.history['val_loss'], label='Validation Loss', linewidth=2.5)
+ax2.set_title('Training & Validation Loss')
+ax2.set_xlabel('Epoch'); ax2.set_ylabel('Loss'); ax2.legend(); ax2.grid(True, alpha=0.3)
 
 plt.tight_layout()
 plt.show()
 
-# Final evaluation
-print(f"\n" + "=" * 50)
+# ================================
+# Final evaluation (predictions)
+# ================================
+print("\n" + "="*50)
 print("FINAL EVALUATION")
-print("=" * 50)
+print("="*50)
 
 start_test = time.time()
 y_pred_probs = model.predict(X_test, verbose=0)
 y_pred = np.argmax(y_pred_probs, axis=1)
 end_test = time.time()
 
-# Calculate metrics
+# Macro metrics
 acc = accuracy_score(y_test_enc, y_pred)
 prec = precision_score(y_test_enc, y_pred, average='macro', zero_division=0)
-rec = recall_score(y_test_enc, y_pred, average='macro', zero_division=0)
-f1 = f1_score(y_test_enc, y_pred, average='macro', zero_division=0)
+rec  = recall_score(y_test_enc, y_pred, average='macro', zero_division=0)
+f1   = f1_score(y_test_enc, y_pred, average='macro', zero_division=0)
 
 print(f"Training Time: {end_train - start_train:.2f} seconds")
-print(f"Testing Time: {end_test - start_test:.2f} seconds")
+print(f"Testing  Time: {end_test - start_test:.2f} seconds")
 print(f"Epochs Completed: {len(history.history['accuracy'])}")
 
-print(f"\n🎯 MODEL PERFORMANCE:")
+print("\n🎯 MODEL PERFORMANCE:")
 print(f"├── Accuracy:  {acc * 100:.2f}%")
 print(f"├── Precision: {prec * 100:.2f}%")
 print(f"├── Recall:    {rec * 100:.2f}%")
 print(f"└── F1-Score:  {f1 * 100:.2f}%")
 
-# Confusion matrix visualization
-cm = confusion_matrix(y_test_enc, y_pred)
+# ================================
+# Confusion matrices
+# ================================
+cm = confusion_matrix(y_test_enc, y_pred, labels=list(range(len(class_names))))
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 7))
 
-# Raw counts
 sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
             xticklabels=class_names, yticklabels=class_names,
-            ax=ax1, cbar_kws={'label': 'Count'},
-            annot_kws={'size': 12, 'weight': 'bold'})
-ax1.set_title('Confusion Matrix (Counts)', fontsize=16, fontweight='bold')
-ax1.set_xlabel('Predicted Label', fontsize=12)
-ax1.set_ylabel('True Label', fontsize=12)
+            ax=ax1, cbar_kws={'label': 'Count'}, annot_kws={'size': 12, 'weight': 'bold'})
+ax1.set_title('Confusion Matrix (Counts)')
+ax1.set_xlabel('Predicted Label')
+ax1.set_ylabel('True Label')
 
-# Normalized
-cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+cm_norm = cm.astype('float') / cm.sum(axis=1, keepdims=True)
 sns.heatmap(cm_norm, annot=True, fmt='.3f', cmap='Blues',
             xticklabels=class_names, yticklabels=class_names,
-            ax=ax2, cbar_kws={'label': 'Proportion'},
-            annot_kws={'size': 12, 'weight': 'bold'})
-ax2.set_title('Confusion Matrix (Normalized)', fontsize=16, fontweight='bold')
-ax2.set_xlabel('Predicted Label', fontsize=12)
-ax2.set_ylabel('True Label', fontsize=12)
+            ax=ax2, cbar_kws={'label': 'Proportion'}, annot_kws={'size': 12, 'weight': 'bold'})
+ax2.set_title('Confusion Matrix (Normalized)')
+ax2.set_xlabel('Predicted Label')
+ax2.set_ylabel('True Label')
 
 plt.tight_layout()
 plt.show()
 
-# Per-class analysis WITH class-wise accuracy
-report = classification_report(y_test_enc, y_pred, target_names=class_names,
-                               output_dict=True, zero_division=0)
+# ================================
+# Per-class report (precision/recall/F1/support) + class-wise accuracy
+# ================================
+report = classification_report(
+    y_test_enc, y_pred, target_names=class_names, output_dict=True, zero_division=0
+)
 
-print(f"\n" + "=" * 80)
+print("\n" + "="*80)
 print("DETAILED PERFORMANCE ANALYSIS (WITH CLASS-WISE ACCURACY)")
-print("=" * 80)
+print("="*80)
 
-# Calculate class-wise accuracy from confusion matrix
 class_accuracies = cm.diagonal() / cm.sum(axis=1)
-
 class_performance = []
 for i, class_name in enumerate(class_names):
     metrics = report[class_name]
     class_performance.append({
         'Class': class_name,
-        'Accuracy': f"{class_accuracies[i] * 100:.2f}%",  # Added class-wise accuracy
-        'Precision': f"{metrics['precision'] * 100:.2f}%",
-        'Recall': f"{metrics['recall'] * 100:.2f}%",
-        'F1-Score': f"{metrics['f1-score'] * 100:.2f}%",
+        'Accuracy': f"{class_accuracies[i]*100:.2f}%",
+        'Precision': f"{metrics['precision']*100:.2f}%",
+        'Recall': f"{metrics['recall']*100:.2f}%",
+        'F1-Score': f"{metrics['f1-score']*100:.2f}%",
         'Support': int(metrics['support'])
     })
-
 df_performance = pd.DataFrame(class_performance)
 print(df_performance.to_string(index=False))
 
-# Additional class-wise accuracy section
-print(f"\n" + "=" * 50)
+print("\n" + "="*50)
 print("CLASS-WISE ACCURACY BREAKDOWN")
-print("=" * 50)
-
+print("="*50)
 for i, class_name in enumerate(class_names):
-    print(f"{class_name:<15}: {class_accuracies[i] * 100:6.2f}%")
+    print(f"{class_name:<15}: {class_accuracies[i]*100:6.2f}%")
 
-# Attack detection performance
-y_test_binary = (y_test_enc != 0).astype(int)  # Normal vs Attack
-y_pred_binary = (y_pred != 0).astype(int)
+# ================================
+# One-vs-rest per-class metrics (incl. specificity, ROC-AUC, PR-AUC)
+# ================================
+print("\n" + "="*80)
+print("PER-CLASS METRICS (ONE-VS-REST)")
+print("="*80)
 
-binary_acc = accuracy_score(y_test_binary, y_pred_binary)
-binary_prec = precision_score(y_test_binary, y_pred_binary, zero_division=0)
-binary_rec = recall_score(y_test_binary, y_pred_binary, zero_division=0)
-binary_f1 = f1_score(y_test_binary, y_pred_binary, zero_division=0)
+N = cm.sum()
+rows = []
+for i, name in enumerate(class_names):
+    TP = cm[i, i]
+    FN = cm[i, :].sum() - TP
+    FP = cm[:, i].sum() - TP
+    TN = N - TP - FN - FP
 
-print(f"\n" + "=" * 50)
+    prec_i = TP / (TP + FP) if (TP + FP) else 0.0
+    rec_tpr = TP / (TP + FN) if (TP + FN) else 0.0
+    spec_tnr = TN / (TN + FP) if (TN + FP) else 0.0
+    f1_i = 2 * prec_i * rec_tpr / (prec_i + rec_tpr) if (prec_i + rec_tpr) else 0.0
+    acc_ovr = (TP + TN) / N if N else 0.0
+
+    # Probability scores for AUCs
+    y_true_bin = (y_test_enc == i).astype(int)
+    y_score = y_pred_probs[:, i]
+
+    if y_true_bin.max() > 0 and y_true_bin.min() == 0:
+        try:
+            roc_auc = roc_auc_score(y_true_bin, y_score)
+        except Exception:
+            roc_auc = np.nan
+        try:
+            pr_auc = average_precision_score(y_true_bin, y_score)
+        except Exception:
+            pr_auc = np.nan
+    else:
+        roc_auc = np.nan
+        pr_auc = np.nan
+
+    rows.append({
+        "class": name,
+        "support": int(cm[i, :].sum()),
+        "precision": prec_i,
+        "recall_TPR": rec_tpr,
+        "specificity_TNR": spec_tnr,
+        "f1": f1_i,
+        "accuracy_ovr": acc_ovr,
+        "roc_auc_ovr": float(roc_auc) if roc_auc == roc_auc else None,
+        "pr_auc_ovr":  float(pr_auc) if pr_auc == pr_auc else None
+    })
+
+per_class_df = pd.DataFrame(rows).sort_values("class")
+pd.options.display.float_format = lambda v: f"{v:.4f}"
+print(per_class_df.to_string(index=False))
+
+# Save per-class tables
+per_class_df.to_csv("per_class_metrics_nearmiss.csv", index=False)
+with open("per_class_metrics_nearmiss.json", "w") as f:
+    json.dump(per_class_df.to_dict(orient="records"), f, indent=2)
+
+print("\nSaved per-class metrics to:")
+print("  • per_class_metrics_nearmiss.csv")
+print("  • per_class_metrics_nearmiss.json")
+
+# ================================
+# Attack detection (Normal vs Attack)
+# ================================
+print("\n" + "="*50)
 print("ATTACK DETECTION PERFORMANCE")
-print("=" * 50)
-print(f"Normal vs Attack Classification:")
+print("="*50)
+# Find "normal" label index (case-insensitive). Fallback to 0 if absent.
+normal_id_arr = np.where(np.array([c.lower() for c in class_names]) == "normal")[0]
+normal_id = int(normal_id_arr[0]) if len(normal_id_arr) else 0
+
+y_test_binary = (y_test_enc != normal_id).astype(int)  # 0: Normal, 1: Attack
+y_pred_binary = (y_pred != normal_id).astype(int)
+
+binary_acc  = accuracy_score(y_test_binary, y_pred_binary)
+binary_prec = precision_score(y_test_binary, y_pred_binary, zero_division=0)
+binary_rec  = recall_score(y_test_binary, y_pred_binary, zero_division=0)
+binary_f1   = f1_score(y_test_binary, y_pred_binary, zero_division=0)
+
+print("Normal vs Attack Classification:")
 print(f"├── Accuracy:  {binary_acc * 100:.2f}%")
 print(f"├── Precision: {binary_prec * 100:.2f}%")
 print(f"├── Recall:    {binary_rec * 100:.2f}%")
 print(f"└── F1-Score:  {binary_f1 * 100:.2f}%")
 
+# ================================
 # Save model and results
-model.save('kdd_optimal_model.keras')
+# ================================
+model.save('kdd_optimal_model_nearmiss.keras')
 
 results_summary = {
     "timestamp": datetime.now().isoformat(),
-    "model_type": "Optimal Hyperband Model",
-    "hyperparameters": best_hyperparams,
-    "epochs_completed": len(history.history['accuracy']),
-    "training_time_seconds": end_train - start_train,
-    "testing_time_seconds": end_test - start_test,
-    "performance": {
+    "model_type": "Optimal Hyperband Model + NearMiss",
+    "hyperparameters": {
+        **best_hyperparams,
+        "nearmiss_version": 1,
+        "nearmiss_strategy": "auto (to minority)"
+    },
+    "epochs_completed": int(len(history.history['accuracy'])),
+    "training_time_seconds": float(end_train - start_train),
+    "testing_time_seconds": float(end_test - start_test),
+    "macro_performance": {
         "accuracy": float(acc),
         "precision": float(prec),
         "recall": float(rec),
         "f1_score": float(f1)
     },
     "class_wise_accuracy": {
-        class_names[i]: float(class_accuracies[i]) for i in range(len(class_names))
+        str(class_names[i]): float(class_accuracies[i]) for i in range(len(class_names))
     },
+    "per_class_metrics": per_class_df.to_dict(orient="records"),
     "attack_detection": {
         "binary_accuracy": float(binary_acc),
         "binary_precision": float(binary_prec),
         "binary_recall": float(binary_rec),
         "binary_f1": float(binary_f1)
-    }
+    },
+    "train_class_counts_before": {str(class_names[k]): int(v) for k, v in counts_before.items()},
+    "train_class_counts_after":  {str(class_names[k]): int(v) for k, v in counts_after.items()}
 }
 
-with open("optimal_model_results.json", 'w') as f:
+with open("optimal_model_results_nearmiss.json", 'w') as f:
     json.dump(results_summary, f, indent=4)
 
-print(f"\n" + "=" * 60)
-print("✅ MODEL TRAINING COMPLETE!")
-print("=" * 60)
-print(f"🎯 Final Accuracy: {acc * 100:.2f}%")
-print("📁 Model saved as: kdd_optimal_model.keras")
-print("📁 Results saved as: optimal_model_results.json")
-print("✅ Class-wise accuracy included in detailed analysis!")
+print("\n" + "="*60)
+print("✅ MODEL TRAINING COMPLETE (NEARMISS)!")
+print("="*60)
+print(f"🎯 Final Accuracy: {acc*100:.2f}%")
+print("📁 Model saved as: kdd_optimal_model_nearmiss.keras")
+print("📁 Results saved as: optimal_model_results_nearmiss.json")
+print("📁 Per-class CSV:   per_class_metrics_nearmiss.csv")
+print("📁 Per-class JSON:  per_class_metrics_nearmiss.json")

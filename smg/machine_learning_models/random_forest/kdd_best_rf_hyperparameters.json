@@ -1,0 +1,24 @@
+{
+  "dataset": "NSL-KDD (5-class)",
+  "model_type": "RandomForestClassifier",
+  "best_parameters": {
+    "n_estimators": 100,
+    "min_samples_split": 2,
+    "min_samples_leaf": 1,
+    "max_features": "log2",
+    "max_depth": 20,
+    "bootstrap": false
+  },
+  "best_cv_score_f1_macro": 0.8908659873412423,
+  "class_names": [
+    "DoS",
+    "Probe",
+    "R2L",
+    "U2R",
+    "normal"
+  ],
+  "cv_folds": 2,
+  "n_iter": 10,
+  "search_seconds": 149.09954190254211,
+  "notes": "ULTRA SPEED: 2-fold CV, 10 iterations. Preprocessing: OHE for categorical (protocol_type, service, flag), MinMax+median impute for numerics."
+}

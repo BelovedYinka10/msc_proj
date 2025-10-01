@@ -1,5 +1,5 @@
 {
-    "timestamp": "2025-09-26T09:23:13.651517",
+    "timestamp": "2025-09-30T23:40:53.311291",
     "model_type": "Optimal Hyperband Model",
     "hyperparameters": {
         "num_layers": 2,
@@ -16,25 +16,25 @@
         "learning_rate": 0.00030418
     },
     "epochs_completed": 20,
-    "training_time_seconds": 227.82575583457947,
-    "testing_time_seconds": 0.8275430202484131,
+    "training_time_seconds": 570.0730648040771,
+    "testing_time_seconds": 1.5307908058166504,
     "performance": {
-        "accuracy": 0.8860450674237047,
-        "precision": 0.7344430674703294,
-        "recall": 0.668842335371173,
-        "f1_score": 0.679033415134324
+        "accuracy": 0.8739797728885734,
+        "precision": 0.6758128520526321,
+        "recall": 0.6606345702475955,
+        "f1_score": 0.6504885939076849
     },
     "class_wise_accuracy": {
-        "DoS": 0.9418074550817913,
-        "Probe": 0.8331268071045023,
-        "R2L": 0.43427741466957154,
-        "U2R": 0.135,
-        "normal": 1.0
+        "DoS": 0.9133816036470904,
+        "Probe": 0.8620404791408509,
+        "R2L": 0.38816267247639796,
+        "U2R": 0.14,
+        "normal": 0.9995880959736382
     },
     "attack_detection": {
-        "binary_accuracy": 0.9242814052519518,
-        "binary_precision": 0.9695374464799607,
-        "binary_recall": 0.9156171284634761,
-        "binary_f1": 0.9418061568881465
+        "binary_accuracy": 0.9230837473385379,
+        "binary_precision": 0.9558863698443049,
+        "binary_recall": 0.9278801537849662,
+        "binary_f1": 0.9416750756811302
     }
 }

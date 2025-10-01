@@ -1,0 +1,57 @@
+[
+  {
+    "class": "DoS",
+    "support": 7458,
+    "precision": 0.8724574645004477,
+    "recall_TPR": 0.9144542772861357,
+    "specificity_TNR": 0.9339122365106721,
+    "f1": 0.8929623567921441,
+    "accuracy_ovr": 0.9274751596877218,
+    "roc_auc_ovr": 0.981700132434594,
+    "pr_auc_ovr": 0.9476495633488468
+  },
+  {
+    "class": "Probe",
+    "support": 2421,
+    "precision": 0.6991327551701134,
+    "recall_TPR": 0.86575795125981,
+    "specificity_TNR": 0.9551756696317647,
+    "f1": 0.7735744602325152,
+    "accuracy_ovr": 0.9455731014904187,
+    "roc_auc_ovr": 0.9535482454117421,
+    "pr_auc_ovr": 0.8748136758058725
+  },
+  {
+    "class": "R2L",
+    "support": 2754,
+    "precision": 0.7738095238095238,
+    "recall_TPR": 0.5192447349310094,
+    "specificity_TNR": 0.978878221323901,
+    "f1": 0.6214689265536724,
+    "accuracy_ovr": 0.9227288857345636,
+    "roc_auc_ovr": 0.9686544226359345,
+    "pr_auc_ovr": 0.8045245368866613
+  },
+  {
+    "class": "U2R",
+    "support": 200,
+    "precision": 0.18285714285714286,
+    "recall_TPR": 0.16,
+    "specificity_TNR": 0.9936000716075905,
+    "f1": 0.17066666666666666,
+    "accuracy_ovr": 0.9862047551454932,
+    "roc_auc_ovr": 0.909625179018976,
+    "pr_auc_ovr": 0.13196025146085277
+  },
+  {
+    "class": "normal",
+    "support": 9711,
+    "precision": 1.0,
+    "recall_TPR": 0.9994851199670477,
+    "specificity_TNR": 1.0,
+    "f1": 0.9997424936910954,
+    "accuracy_ovr": 0.999778211497516,
+    "roc_auc_ovr": 1.0,
+    "pr_auc_ovr": 1.0
+  }
+]
