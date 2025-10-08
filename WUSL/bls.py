@@ -180,7 +180,7 @@ class BaselineIDS:
         """Train baseline model and evaluate"""
 
         print(f"\nDataset: {len(X):,} samples, {len(X.columns)} features, {len(y.unique())} classes")
-        print("\nClass distribution (BEFORE BorderlineSMOTE):")
+        print("\nClass distribution (BEFORE SMOTE):")
         for cls, count in y.value_counts().sort_index().items():
             pct = count / len(y) * 100
             print(f"  {cls:20s}: {count:7,} ({pct:5.2f}%)")
@@ -213,41 +213,37 @@ class BaselineIDS:
         X_train_scaled = scaler.fit_transform(X_train_imp)
         X_test_scaled = scaler.transform(X_test_imp)
 
-        # Apply BorderlineSMOTE if enabled
-        if self.cfg.use_bls:
-            print(f"\nApplying BorderlineSMOTE...")
-            print(f"  Sampling strategy: {self.cfg.bls_sampling_strategy}")
-            print(f"  K neighbors: {self.cfg.bls_k_neighbors}")
-            print(f"  M neighbors: {self.cfg.bls_m_neighbors}")
-            print(f"  Kind: {self.cfg.bls_kind}")
+        # Apply SMOTE if enabled
+        if self.cfg.use_smote:
+            print(f"\nApplying SMOTE...")
+            print(f"  Sampling strategy: {self.cfg.smote_sampling_strategy}")
+            print(f"  K neighbors: {self.cfg.smote_k_neighbors}")
 
-            print(f"\nClass distribution before BorderlineSMOTE:")
+            print(f"\nClass distribution before SMOTE:")
             unique, counts = np.unique(y_train_idx, return_counts=True)
             for idx, count in zip(unique, counts):
                 print(f"  {labels[idx]:20s}: {count:7,}")
 
-            bls = BorderlineSMOTE(
-                sampling_strategy=self.cfg.bls_sampling_strategy,
-                k_neighbors=self.cfg.bls_k_neighbors,
-                m_neighbors=self.cfg.bls_m_neighbors,
-                kind=self.cfg.bls_kind,
+            smote = SMOTE(
+                sampling_strategy=self.cfg.smote_sampling_strategy,
+                k_neighbors=self.cfg.smote_k_neighbors,
                 random_state=self.cfg.random_state
             )
 
             try:
-                X_train_scaled, y_train_idx = bls.fit_resample(X_train_scaled, y_train_idx)
+                X_train_scaled, y_train_idx = smote.fit_resample(X_train_scaled, y_train_idx)
 
-                print(f"\nClass distribution after BorderlineSMOTE:")
+                print(f"\nClass distribution after SMOTE:")
                 unique, counts = np.unique(y_train_idx, return_counts=True)
                 for idx, count in zip(unique, counts):
                     print(f"  {labels[idx]:20s}: {count:7,}")
 
-                print(f"\nTotal training samples after BorderlineSMOTE: {len(y_train_idx):,}")
+                print(f"\nTotal training samples after SMOTE: {len(y_train_idx):,}")
             except Exception as e:
-                print(f"\nWarning: BorderlineSMOTE failed with error: {e}")
-                print("Continuing without BorderlineSMOTE...")
+                print(f"\nWarning: SMOTE failed with error: {e}")
+                print("Continuing without SMOTE...")
         else:
-            print("\nBorderlineSMOTE: DISABLED")
+            print("\nSMOTE: DISABLED")
 
         # Validation split
         val_size = max(1, int(len(X_train_scaled) * self.cfg.val_ratio))
@@ -316,14 +312,14 @@ class BaselineIDS:
 
         # Generate report
         print("\n" + "=" * 70)
-        print("BASELINE RESULTS (WITH TomekLinks)" if self.cfg.use_tomek else "BASELINE RESULTS")
+        print("BASELINE RESULTS (WITH SMOTE)" if self.cfg.use_smote else "BASELINE RESULTS")
         print("=" * 70)
 
         report = per_class_report(y_test.values, y_pred, labels)
         print("\n" + report.to_string(index=False))
 
         # Save report
-        suffix = "_tomek" if self.cfg.use_tomek else ""
+        suffix = "_smote" if self.cfg.use_smote else ""
         report_path = os.path.join(self.cfg.save_dir, f"baseline_results{suffix}.csv")
         report.to_csv(report_path, index=False)
 
@@ -366,16 +362,17 @@ def main():
         learning_rate=5e-4,
         batch_size=128,
         epochs=100,
-        use_tomek=True,  # Enable TomekLinks
-        tomek_sampling_strategy="auto",  # Remove Tomek links from all classes
-        use_class_weight=True,  # Class weights may still help with undersampling
+        use_smote=True,  # Enable SMOTE
+        smote_sampling_strategy="auto",  # Balance all minority classes
+        smote_k_neighbors=5,
+        use_class_weight=False,  # Usually not needed with SMOTE
         save_dir="./baseline_outputs"
     )
 
     print("=" * 70)
     print("BASELINE DNN FOR IIoT IDS")
     print("Single-Stage Multi-Class Classification")
-    print("Enhanced with TomekLinks Undersampling")
+    print("Enhanced with SMOTE Oversampling")
     print("=" * 70)
 
     baseline = BaselineIDS(cfg)
