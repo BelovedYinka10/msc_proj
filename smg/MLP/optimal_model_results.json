@@ -1,0 +1,97 @@
+{
+    "timestamp": "2025-09-30T22:14:40.717085",
+    "model_type": "Optimal Hyperband Model",
+    "hyperparameters": {
+        "num_layers": 2,
+        "units_0": 224,
+        "activation_0": "tanh",
+        "kernel_init": "he_normal",
+        "batch_norm_0": true,
+        "dropout_0": 0.0,
+        "units_1": 480,
+        "activation_1": "relu",
+        "batch_norm_1": true,
+        "dropout_1": 0.1,
+        "optimizer": "adam",
+        "learning_rate": 0.00030418
+    },
+    "epochs_completed": 20,
+    "training_time_seconds": 240.40476536750793,
+    "testing_time_seconds": 1.3670148849487305,
+    "macro_performance": {
+        "accuracy": 0.8908800567778566,
+        "precision": 1.0,
+        "recall": 0.6917884166888006,
+        "f1_score": 0.6916829807872187
+    },
+    "class_wise_accuracy": {
+        "DoS": 0.9144542772861357,
+        "Probe": 0.86575795125981,
+        "R2L": 0.5192447349310094,
+        "U2R": 0.16,
+        "normal": 0.9994851199670477
+    },
+    "per_class_metrics": [
+        {
+            "class": "DoS",
+            "support": 7458,
+            "precision": 0.8724574645004477,
+            "recall_TPR": 0.9144542772861357,
+            "specificity_TNR": 0.9339122365106721,
+            "f1": 0.8929623567921441,
+            "accuracy_ovr": 0.9274751596877218,
+            "roc_auc_ovr": 0.981700132434594,
+            "pr_auc_ovr": 0.9476495633488468
+        },
+        {
+            "class": "Probe",
+            "support": 2421,
+            "precision": 0.6991327551701134,
+            "recall_TPR": 0.86575795125981,
+            "specificity_TNR": 0.9551756696317647,
+            "f1": 0.7735744602325152,
+            "accuracy_ovr": 0.9455731014904187,
+            "roc_auc_ovr": 0.9535482454117421,
+            "pr_auc_ovr": 0.8748136758058725
+        },
+        {
+            "class": "R2L",
+            "support": 2754,
+            "precision": 0.7738095238095238,
+            "recall_TPR": 0.5192447349310094,
+            "specificity_TNR": 0.978878221323901,
+            "f1": 0.6214689265536724,
+            "accuracy_ovr": 0.9227288857345636,
+            "roc_auc_ovr": 0.9686544226359345,
+            "pr_auc_ovr": 0.8045245368866613
+        },
+        {
+            "class": "U2R",
+            "support": 200,
+            "precision": 0.18285714285714286,
+            "recall_TPR": 0.16,
+            "specificity_TNR": 0.9936000716075905,
+            "f1": 0.17066666666666666,
+            "accuracy_ovr": 0.9862047551454932,
+            "roc_auc_ovr": 0.909625179018976,
+            "pr_auc_ovr": 0.13196025146085277
+        },
+        {
+            "class": "normal",
+            "support": 9711,
+            "precision": 1.0,
+            "recall_TPR": 0.9994851199670477,
+            "specificity_TNR": 1.0,
+            "f1": 0.9997424936910954,
+            "accuracy_ovr": 0.999778211497516,
+            "roc_auc_ovr": 1.0,
+            "pr_auc_ovr": 1.0
+        }
+    ],
+    "attack_detection": {
+        "binary_accuracy": 0.999778211497516,
+        "binary_precision": 0.9996105312353949,
+        "binary_recall": 1.0,
+        "binary_f1": 0.9998052276888317
+    }
+}

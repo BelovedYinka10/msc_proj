@@ -1,0 +1,18 @@
+{
+  "best_parameters": {
+    "min_samples_split": 5,
+    "min_samples_leaf": 2,
+    "max_features": "sqrt",
+    "max_depth": 22,
+    "n_estimators": 300,
+    "bootstrap": true,
+    "n_jobs": -1
+  },
+  "best_cv_score": 0.9087766002063082,
+  "model_type": "RandomForestClassifier",
+  "class_names": [
+    "FDIA",
+    "Normal",
+    "TDA"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "dataset": "NSL-KDD (5-class)",
+  "model_type": "DecisionTreeClassifier",
+  "best_parameters": {
+    "splitter": "best",
+    "min_samples_split": 5,
+    "min_samples_leaf": 1,
+    "max_leaf_nodes": null,
+    "max_features": null,
+    "max_depth": 25,
+    "criterion": "entropy",
+    "class_weight": null
+  },
+  "best_cv_score_f1_macro": 0.9060096289126817,
+  "class_names": [
+    "DoS",
+    "Probe",
+    "R2L",
+    "U2R",
+    "normal"
+  ],
+  "cv_folds": 3,
+  "n_iter": 100,
+  "search_seconds": 128.69490599632263,
+  "notes": "Preprocessing: OHE for categorical (protocol_type, service, flag), MinMax+median impute for numerics."
+}

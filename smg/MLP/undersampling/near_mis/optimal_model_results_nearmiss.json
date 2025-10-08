@@ -1,0 +1,113 @@
+{
+    "timestamp": "2025-10-01T00:19:40.244611",
+    "model_type": "Optimal Hyperband Model + NearMiss",
+    "hyperparameters": {
+        "num_layers": 2,
+        "units_0": 224,
+        "activation_0": "tanh",
+        "kernel_init": "he_normal",
+        "batch_norm_0": true,
+        "dropout_0": 0.0,
+        "units_1": 480,
+        "activation_1": "relu",
+        "batch_norm_1": true,
+        "dropout_1": 0.1,
+        "optimizer": "adam",
+        "learning_rate": 0.00030418,
+        "nearmiss_version": 1,
+        "nearmiss_strategy": "auto (to minority)"
+    },
+    "epochs_completed": 20,
+    "training_time_seconds": 4.394248008728027,
+    "testing_time_seconds": 1.4130728244781494,
+    "macro_performance": {
+        "accuracy": 0.1931334279630944,
+        "precision": 0.2937509618938178,
+        "recall": 0.32321075538387506,
+        "f1_score": 0.1744977558575284
+    },
+    "class_wise_accuracy": {
+        "DoS": 0.16706891928130865,
+        "Probe": 0.08880627839735647,
+        "R2L": 0.2933914306463326,
+        "U2R": 0.87,
+        "normal": 0.19678714859437751
+    },
+    "per_class_metrics": [
+        {
+            "class": "DoS",
+            "support": 7458,
+            "precision": 0.14235119387638523,
+            "recall_TPR": 0.16706891928130865,
+            "specificity_TNR": 0.5023863184409386,
+            "f1": 0.15372278082783294,
+            "accuracy_ovr": 0.3914567068843151,
+            "roc_auc_ovr": 0.2667273778544088,
+            "pr_auc_ovr": 0.3053638391583036
+        },
+        {
+            "class": "Probe",
+            "support": 2421,
+            "precision": 0.09538598047914817,
+            "recall_TPR": 0.08880627839735647,
+            "specificity_TNR": 0.8986731600655966,
+            "f1": 0.09197860962566845,
+            "accuracy_ovr": 0.8117015613910575,
+            "roc_auc_ovr": 0.36991353855326303,
+            "pr_auc_ovr": 0.0799765206433091
+        },
+        {
+            "class": "R2L",
+            "support": 2754,
+            "precision": 0.19985159534998764,
+            "recall_TPR": 0.2933914306463326,
+            "specificity_TNR": 0.836533602829712,
+            "f1": 0.2377519493894365,
+            "accuracy_ovr": 0.7701827537260468,
+            "roc_auc_ovr": 0.47722273046362257,
+            "pr_auc_ovr": 0.1196398422564827
+        },
+        {
+            "class": "U2R",
+            "support": 200,
+            "precision": 0.031166039763567976,
+            "recall_TPR": 0.87,
+            "specificity_TNR": 0.757921589688507,
+            "f1": 0.060176379042019716,
+            "accuracy_ovr": 0.758915897799858,
+            "roc_auc_ovr": 0.8525672440028642,
+            "pr_auc_ovr": 0.05182688745698484
+        },
+        {
+            "class": "normal",
+            "support": 9711,
+            "precision": 1.0,
+            "recall_TPR": 0.19678714859437751,
+            "specificity_TNR": 1.0,
+            "f1": 0.3288590604026846,
+            "accuracy_ovr": 0.6540099361249113,
+            "roc_auc_ovr": 0.9786762271860461,
+            "pr_auc_ovr": 0.9744355715401969
+        }
+    ],
+    "attack_detection": {
+        "binary_accuracy": 0.6540099361249113,
+        "binary_precision": 0.6219648136480396,
+        "binary_recall": 1.0,
+        "binary_f1": 0.7669276280403992
+    },
+    "train_class_counts_before": {
+        "normal": 67343,
+        "DoS": 45927,
+        "R2L": 995,
+        "Probe": 11656,
+        "U2R": 52
+    },
+    "train_class_counts_after": {
+        "DoS": 52,
+        "Probe": 52,
+        "R2L": 52,
+        "U2R": 52,
+        "normal": 52
+    }
+}

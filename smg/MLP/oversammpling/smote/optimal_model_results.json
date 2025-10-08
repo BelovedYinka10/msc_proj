@@ -1,0 +1,40 @@
+{
+    "timestamp": "2025-09-26T09:32:22.743411",
+    "model_type": "Optimal Hyperband Model",
+    "hyperparameters": {
+        "num_layers": 2,
+        "units_0": 224,
+        "activation_0": "tanh",
+        "kernel_init": "he_normal",
+        "batch_norm_0": true,
+        "dropout_0": 0.0,
+        "units_1": 480,
+        "activation_1": "relu",
+        "batch_norm_1": true,
+        "dropout_1": 0.1,
+        "optimizer": "adam",
+        "learning_rate": 0.00030418
+    },
+    "epochs_completed": 20,
+    "training_time_seconds": 256.65487909317017,
+    "testing_time_seconds": 0.883065938949585,
+    "performance": {
+        "accuracy": 0.8739354151880766,
+        "precision": 0.6725926335175427,
+        "recall": 0.6454206377939222,
+        "f1_score": 0.6442543429400612
+    },
+    "class_wise_accuracy": {
+        "DoS": 0.9281308661839636,
+        "Probe": 0.7980173482032218,
+        "R2L": 0.4059549745824256,
+        "U2R": 0.095,
+        "normal": 1.0
+    },
+    "attack_detection": {
+        "binary_accuracy": 0.9197569198012775,
+        "binary_precision": 0.9626454805212907,
+        "binary_recall": 0.9156171284634761,
+        "binary_f1": 0.9385425513844063
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "used_parameters": {
+    "C": 82.4431219090508,
+    "class_weight": "balanced",
+    "fit_intercept": true,
+    "max_iter": 1000,
+    "penalty": "l1",
+    "solver": "saga"
+  },
+  "model_type": "LogisticRegression",
+  "accuracy": 0.6557553404026433,
+  "precision": 0.6359411549658223,
+  "recall": 0.7217371500510507,
+  "f1": 0.6361549472118214,
+  "training_time": 9.121371746063232,
+  "testing_time": 0.002566099166870117,
+  "class_names": [
+    "FDIA",
+    "Normal",
+    "TDA"
+  ]
+}
