@@ -1,6 +1,7 @@
 # baseline_ids_simple.py
 # Simple Baseline DNN for IIoT IDS (NO Multi-Stage)
 # Direct comparison to MSDL approach
+# Enhanced with ADASYN for handling class imbalance
 
 import os
 import random
@@ -24,6 +25,7 @@ from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix
+from imblearn.over_sampling import ADASYN
 
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -33,7 +35,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 @dataclass
 class BaselineConfig:
     # Dataset
-    csv_path: str = "wustl_iiot_2021.csv"
+    csv_path: str = "../wustl_iiot_2021.csv"
     label_col: str = "Traffic"
     drop_cols: Tuple[str, ...] = ("StartTime", "LastTime", "SrcAddr", "DstAddr", "sIpId", "dIpId")
 
@@ -47,11 +49,16 @@ class BaselineConfig:
     epochs: int = 100
     val_ratio: float = 0.30
 
+    # ADASYN parameters
+    use_adasyn: bool = True  # Set to False to disable ADASYN
+    adasyn_sampling_strategy: str = "auto"  # 'auto', 'minority', 'not majority', or dict
+    adasyn_n_neighbors: int = 5  # Number of nearest neighbors for ADASYN
+
     # Class weighting options
-    use_class_weight: bool = True  # Set to False for no class weights
+    use_class_weight: bool = False  # Set to False when using ADASYN (usually not needed together)
 
     # Output
-    save_dir: str = "./baseline_outputs"
+    save_dir: str = "../baseline_outputs"
 
 
 def ensure_numeric(df: pd.DataFrame) -> pd.DataFrame:
@@ -171,7 +178,7 @@ class BaselineIDS:
         """Train baseline model and evaluate"""
 
         print(f"\nDataset: {len(X):,} samples, {len(X.columns)} features, {len(y.unique())} classes")
-        print("\nClass distribution:")
+        print("\nClass distribution (BEFORE ADASYN):")
         for cls, count in y.value_counts().sort_index().items():
             pct = count / len(y) * 100
             print(f"  {cls:20s}: {count:7,} ({pct:5.2f}%)")
@@ -203,6 +210,38 @@ class BaselineIDS:
         scaler = StandardScaler(with_mean=True, with_std=True)
         X_train_scaled = scaler.fit_transform(X_train_imp)
         X_test_scaled = scaler.transform(X_test_imp)
+
+        # Apply ADASYN if enabled
+        if self.cfg.use_adasyn:
+            print(f"\nApplying ADASYN...")
+            print(f"  Sampling strategy: {self.cfg.adasyn_sampling_strategy}")
+            print(f"  N neighbors: {self.cfg.adasyn_n_neighbors}")
+
+            print(f"\nClass distribution before ADASYN:")
+            unique, counts = np.unique(y_train_idx, return_counts=True)
+            for idx, count in zip(unique, counts):
+                print(f"  {labels[idx]:20s}: {count:7,}")
+
+            adasyn = ADASYN(
+                sampling_strategy=self.cfg.adasyn_sampling_strategy,
+                n_neighbors=self.cfg.adasyn_n_neighbors,
+                random_state=self.cfg.random_state
+            )
+
+            try:
+                X_train_scaled, y_train_idx = adasyn.fit_resample(X_train_scaled, y_train_idx)
+
+                print(f"\nClass distribution after ADASYN:")
+                unique, counts = np.unique(y_train_idx, return_counts=True)
+                for idx, count in zip(unique, counts):
+                    print(f"  {labels[idx]:20s}: {count:7,}")
+
+                print(f"\nTotal training samples after ADASYN: {len(y_train_idx):,}")
+            except Exception as e:
+                print(f"\nWarning: ADASYN failed with error: {e}")
+                print("Continuing without ADASYN...")
+        else:
+            print("\nADASYN: DISABLED")
 
         # Validation split
         val_size = max(1, int(len(X_train_scaled) * self.cfg.val_ratio))
@@ -271,25 +310,26 @@ class BaselineIDS:
 
         # Generate report
         print("\n" + "=" * 70)
-        print("BASELINE RESULTS")
+        print("BASELINE RESULTS (WITH ADASYN)" if self.cfg.use_adasyn else "BASELINE RESULTS")
         print("=" * 70)
 
         report = per_class_report(y_test.values, y_pred, labels)
         print("\n" + report.to_string(index=False))
 
         # Save report
-        report_path = os.path.join(self.cfg.save_dir, "baseline_results.csv")
+        suffix = "_adasyn" if self.cfg.use_adasyn else ""
+        report_path = os.path.join(self.cfg.save_dir, f"baseline_results{suffix}.csv")
         report.to_csv(report_path, index=False)
 
         # Confusion matrix
         cm = confusion_matrix(y_test.values, y_pred, labels=labels)
         cm_df = pd.DataFrame(cm, index=labels, columns=labels)
-        cm_path = os.path.join(self.cfg.save_dir, "confusion_matrix.csv")
+        cm_path = os.path.join(self.cfg.save_dir, f"confusion_matrix{suffix}.csv")
         cm_df.to_csv(cm_path)
 
         print(f"\n✓ Results saved to: {self.cfg.save_dir}/")
-        print(f"  - baseline_results.csv")
-        print(f"  - confusion_matrix.csv")
+        print(f"  - baseline_results{suffix}.csv")
+        print(f"  - confusion_matrix{suffix}.csv")
 
         # Summary statistics
         overall_acc = accuracy_score(y_test.values, y_pred) * 100
@@ -312,7 +352,7 @@ class BaselineIDS:
 def main():
     # Configuration
     cfg = BaselineConfig(
-        csv_path="wustl_iiot_2021.csv",
+        csv_path="../wustl_iiot_2021.csv",
         label_col="Traffic",
         drop_cols=("StartTime", "LastTime", "SrcAddr", "DstAddr", "sIpId", "dIpId"),
         test_size=0.30,
@@ -320,13 +360,17 @@ def main():
         learning_rate=5e-4,
         batch_size=128,
         epochs=100,
-        use_class_weight=True,  # Change to False for no class weights
-        save_dir="./baseline_outputs"
+        use_adasyn=True,  # Enable ADASYN
+        adasyn_sampling_strategy="auto",  # Balance all minority classes
+        adasyn_n_neighbors=5,
+        use_class_weight=False,  # Usually not needed with ADASYN
+        save_dir="../baseline_outputs"
     )
 
     print("=" * 70)
     print("BASELINE DNN FOR IIoT IDS")
     print("Single-Stage Multi-Class Classification")
+    print("Enhanced with ADASYN Oversampling")
     print("=" * 70)
 
     baseline = BaselineIDS(cfg)

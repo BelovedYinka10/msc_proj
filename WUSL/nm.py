@@ -1,7 +1,7 @@
 # baseline_ids_simple.py
 # Simple Baseline DNN for IIoT IDS (NO Multi-Stage)
 # Direct comparison to MSDL approach
-# Enhanced with SMOTE for handling class imbalance
+# Enhanced with NearMiss for handling class imbalance
 
 import os
 import random
@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix
-from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import NearMiss
 
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -49,13 +49,14 @@ class BaselineConfig:
     epochs: int = 100
     val_ratio: float = 0.30
 
-    # SMOTE parameters
-    use_smote: bool = True  # Set to False to disable SMOTE
-    smote_sampling_strategy: str = "auto"  # 'auto', 'minority', 'not majority', or dict
-    smote_k_neighbors: int = 5  # Number of nearest neighbors for SMOTE
+    # NearMiss parameters
+    use_nm: bool = True  # Set to False to disable NearMiss
+    nm_sampling_strategy: str = "auto"  # 'auto', 'majority', 'not minority', 'all', or dict
+    nm_version: int = 1  # 1, 2, or 3 - NearMiss algorithm version
+    nm_n_neighbors: int = 3  # Number of nearest neighbors to consider
 
     # Class weighting options
-    use_class_weight: bool = False  # Set to False when using SMOTE (usually not needed together)
+    use_class_weight: bool = True  # NearMiss is undersampling, so class weights may still help
 
     # Output
     save_dir: str = "./baseline_outputs"
@@ -178,7 +179,7 @@ class BaselineIDS:
         """Train baseline model and evaluate"""
 
         print(f"\nDataset: {len(X):,} samples, {len(X.columns)} features, {len(y.unique())} classes")
-        print("\nClass distribution (BEFORE SMOTE):")
+        print("\nClass distribution (BEFORE NearMiss):")
         for cls, count in y.value_counts().sort_index().items():
             pct = count / len(y) * 100
             print(f"  {cls:20s}: {count:7,} ({pct:5.2f}%)")
@@ -211,37 +212,38 @@ class BaselineIDS:
         X_train_scaled = scaler.fit_transform(X_train_imp)
         X_test_scaled = scaler.transform(X_test_imp)
 
-        # Apply SMOTE if enabled
-        if self.cfg.use_smote:
-            print(f"\nApplying SMOTE...")
-            print(f"  Sampling strategy: {self.cfg.smote_sampling_strategy}")
-            print(f"  K neighbors: {self.cfg.smote_k_neighbors}")
+        # Apply NearMiss if enabled
+        if self.cfg.use_nm:
+            print(f"\nApplying NearMiss...")
+            print(f"  Sampling strategy: {self.cfg.nm_sampling_strategy}")
+            print(f"  Version: {self.cfg.nm_version}")
+            print(f"  N neighbors: {self.cfg.nm_n_neighbors}")
 
-            print(f"\nClass distribution before SMOTE:")
+            print(f"\nClass distribution before NearMiss:")
             unique, counts = np.unique(y_train_idx, return_counts=True)
             for idx, count in zip(unique, counts):
                 print(f"  {labels[idx]:20s}: {count:7,}")
 
-            smote = SMOTE(
-                sampling_strategy=self.cfg.smote_sampling_strategy,
-                k_neighbors=self.cfg.smote_k_neighbors,
-                random_state=self.cfg.random_state
+            nm = NearMiss(
+                sampling_strategy=self.cfg.nm_sampling_strategy,
+                version=self.cfg.nm_version,
+                n_neighbors=self.cfg.nm_n_neighbors
             )
 
             try:
-                X_train_scaled, y_train_idx = smote.fit_resample(X_train_scaled, y_train_idx)
+                X_train_scaled, y_train_idx = nm.fit_resample(X_train_scaled, y_train_idx)
 
-                print(f"\nClass distribution after SMOTE:")
+                print(f"\nClass distribution after NearMiss:")
                 unique, counts = np.unique(y_train_idx, return_counts=True)
                 for idx, count in zip(unique, counts):
                     print(f"  {labels[idx]:20s}: {count:7,}")
 
-                print(f"\nTotal training samples after SMOTE: {len(y_train_idx):,}")
+                print(f"\nTotal training samples after NearMiss: {len(y_train_idx):,}")
             except Exception as e:
-                print(f"\nWarning: SMOTE failed with error: {e}")
-                print("Continuing without SMOTE...")
+                print(f"\nWarning: NearMiss failed with error: {e}")
+                print("Continuing without NearMiss...")
         else:
-            print("\nSMOTE: DISABLED")
+            print("\nNearMiss: DISABLED")
 
         # Validation split
         val_size = max(1, int(len(X_train_scaled) * self.cfg.val_ratio))
@@ -310,14 +312,14 @@ class BaselineIDS:
 
         # Generate report
         print("\n" + "=" * 70)
-        print("BASELINE RESULTS (WITH SMOTE)" if self.cfg.use_smote else "BASELINE RESULTS")
+        print("BASELINE RESULTS (WITH NearMiss)" if self.cfg.use_nm else "BASELINE RESULTS")
         print("=" * 70)
 
         report = per_class_report(y_test.values, y_pred, labels)
         print("\n" + report.to_string(index=False))
 
         # Save report
-        suffix = "_smote" if self.cfg.use_smote else ""
+        suffix = "_nm" if self.cfg.use_nm else ""
         report_path = os.path.join(self.cfg.save_dir, f"baseline_results{suffix}.csv")
         report.to_csv(report_path, index=False)
 
@@ -360,17 +362,18 @@ def main():
         learning_rate=5e-4,
         batch_size=128,
         epochs=100,
-        use_smote=True,  # Enable SMOTE
-        smote_sampling_strategy="auto",  # Balance all minority classes
-        smote_k_neighbors=5,
-        use_class_weight=False,  # Usually not needed with SMOTE
+        use_nm=True,  # Enable NearMiss
+        nm_sampling_strategy="auto",  # Balance all classes by undersampling
+        nm_version=1,  # Use NearMiss-1 algorithm
+        nm_n_neighbors=3,  # Number of nearest neighbors
+        use_class_weight=True,  # Class weights may still help with undersampling
         save_dir="./baseline_outputs"
     )
 
     print("=" * 70)
     print("BASELINE DNN FOR IIoT IDS")
     print("Single-Stage Multi-Class Classification")
-    print("Enhanced with SMOTE Oversampling")
+    print("Enhanced with NearMiss Undersampling")
     print("=" * 70)
 
     baseline = BaselineIDS(cfg)

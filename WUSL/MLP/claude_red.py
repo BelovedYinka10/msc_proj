@@ -33,7 +33,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 @dataclass
 class MSDLConfig:
-    csv_path: str = "wustl_iiot_2021.csv"
+    csv_path: str = "../wustl_iiot_2021.csv"
     label_col: str = "Traffic"
     drop_cols: Tuple[str, ...] = ("StartTime", "LastTime", "SrcAddr", "DstAddr", "sIpId", "dIpId")
     drop_extra_leaky: Tuple[str, ...] = ()
@@ -59,7 +59,7 @@ class MSDLConfig:
     cw_stage3plus_binary: bool = True
 
     max_rows_per_class: Optional[int] = None
-    save_dir: str = "./msdl_outputs_paper_faithful"
+    save_dir: str = "../msdl_outputs_paper_faithful"
 
 
 def ensure_numeric(df: pd.DataFrame) -> pd.DataFrame:
@@ -637,7 +637,7 @@ class MultiStageIDS:
 
 def main():
     cfg = MSDLConfig(
-        csv_path="wustl_iiot_2021.csv",
+        csv_path="../wustl_iiot_2021.csv",
         label_col="Traffic",
         drop_cols=("StartTime", "LastTime", "SrcAddr", "DstAddr", "sIpId", "dIpId"),
         test_size=0.30,
@@ -652,7 +652,7 @@ def main():
         epochs_stage3plus=100,
         learning_rate=5e-4,
         batch_size=128,
-        save_dir="./msdl_outputs_fixed"
+        save_dir="../msdl_outputs_fixed"
     )
 
     print("=" * 70)

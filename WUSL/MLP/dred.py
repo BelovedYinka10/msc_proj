@@ -12,9 +12,9 @@ plt.style.use('seaborn-v0_8-whitegrid')
 sns.set_palette("husl")
 
 # Configuration
-CSV_PATH = "wustl_iiot_2021.csv"
+CSV_PATH = "../wustl_iiot_2021.csv"
 LABEL_COL = "Traffic"
-OUTPUT_DIR = "./plots"
+OUTPUT_DIR = "../plots"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

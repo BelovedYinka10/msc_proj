@@ -1,7 +1,7 @@
 # baseline_ids_simple.py
 # Simple Baseline DNN for IIoT IDS (NO Multi-Stage)
 # Direct comparison to MSDL approach
-# Enhanced with BorderlineSMOTE for handling class imbalance
+# Enhanced with RandomOverSampler for handling class imbalance
 
 import os
 import random
@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix
-from imblearn.over_sampling import BorderlineSMOTE
+from imblearn.over_sampling import RandomOverSampler
 
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -35,7 +35,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 @dataclass
 class BaselineConfig:
     # Dataset
-    csv_path: str = "wustl_iiot_2021.csv"
+    csv_path: str = "../wustl_iiot_2021.csv"
     label_col: str = "Traffic"
     drop_cols: Tuple[str, ...] = ("StartTime", "LastTime", "SrcAddr", "DstAddr", "sIpId", "dIpId")
 
@@ -49,18 +49,15 @@ class BaselineConfig:
     epochs: int = 100
     val_ratio: float = 0.30
 
-    # BorderlineSMOTE parameters
-    use_bls: bool = True  # Set to False to disable BorderlineSMOTE
-    bls_sampling_strategy: str = "auto"  # 'auto', 'minority', 'not majority', or dict
-    bls_k_neighbors: int = 5  # Number of nearest neighbors for BorderlineSMOTE
-    bls_m_neighbors: int = 10  # Number of nearest neighbors to determine borderline samples
-    bls_kind: str = "borderline-1"  # 'borderline-1' or 'borderline-2'
+    # RandomOverSampler parameters
+    use_ros: bool = True  # Set to False to disable RandomOverSampler
+    ros_sampling_strategy: str = "auto"  # 'auto', 'minority', 'not majority', or dict
 
     # Class weighting options
-    use_class_weight: bool = False  # Set to False when using BorderlineSMOTE (usually not needed together)
+    use_class_weight: bool = False  # Set to False when using RandomOverSampler (usually not needed together)
 
     # Output
-    save_dir: str = "./baseline_outputs"
+    save_dir: str = "../baseline_outputs"
 
 
 def ensure_numeric(df: pd.DataFrame) -> pd.DataFrame:
@@ -180,7 +177,7 @@ class BaselineIDS:
         """Train baseline model and evaluate"""
 
         print(f"\nDataset: {len(X):,} samples, {len(X.columns)} features, {len(y.unique())} classes")
-        print("\nClass distribution (BEFORE BorderlineSMOTE):")
+        print("\nClass distribution (BEFORE RandomOverSampler):")
         for cls, count in y.value_counts().sort_index().items():
             pct = count / len(y) * 100
             print(f"  {cls:20s}: {count:7,} ({pct:5.2f}%)")
@@ -213,41 +210,35 @@ class BaselineIDS:
         X_train_scaled = scaler.fit_transform(X_train_imp)
         X_test_scaled = scaler.transform(X_test_imp)
 
-        # Apply BorderlineSMOTE if enabled
-        if self.cfg.use_bls:
-            print(f"\nApplying BorderlineSMOTE...")
-            print(f"  Sampling strategy: {self.cfg.bls_sampling_strategy}")
-            print(f"  K neighbors: {self.cfg.bls_k_neighbors}")
-            print(f"  M neighbors: {self.cfg.bls_m_neighbors}")
-            print(f"  Kind: {self.cfg.bls_kind}")
+        # Apply RandomOverSampler if enabled
+        if self.cfg.use_ros:
+            print(f"\nApplying RandomOverSampler...")
+            print(f"  Sampling strategy: {self.cfg.ros_sampling_strategy}")
 
-            print(f"\nClass distribution before BorderlineSMOTE:")
+            print(f"\nClass distribution before RandomOverSampler:")
             unique, counts = np.unique(y_train_idx, return_counts=True)
             for idx, count in zip(unique, counts):
                 print(f"  {labels[idx]:20s}: {count:7,}")
 
-            bls = BorderlineSMOTE(
-                sampling_strategy=self.cfg.bls_sampling_strategy,
-                k_neighbors=self.cfg.bls_k_neighbors,
-                m_neighbors=self.cfg.bls_m_neighbors,
-                kind=self.cfg.bls_kind,
+            ros = RandomOverSampler(
+                sampling_strategy=self.cfg.ros_sampling_strategy,
                 random_state=self.cfg.random_state
             )
 
             try:
-                X_train_scaled, y_train_idx = bls.fit_resample(X_train_scaled, y_train_idx)
+                X_train_scaled, y_train_idx = ros.fit_resample(X_train_scaled, y_train_idx)
 
-                print(f"\nClass distribution after BorderlineSMOTE:")
+                print(f"\nClass distribution after RandomOverSampler:")
                 unique, counts = np.unique(y_train_idx, return_counts=True)
                 for idx, count in zip(unique, counts):
                     print(f"  {labels[idx]:20s}: {count:7,}")
 
-                print(f"\nTotal training samples after BorderlineSMOTE: {len(y_train_idx):,}")
+                print(f"\nTotal training samples after RandomOverSampler: {len(y_train_idx):,}")
             except Exception as e:
-                print(f"\nWarning: BorderlineSMOTE failed with error: {e}")
-                print("Continuing without BorderlineSMOTE...")
+                print(f"\nWarning: RandomOverSampler failed with error: {e}")
+                print("Continuing without RandomOverSampler...")
         else:
-            print("\nBorderlineSMOTE: DISABLED")
+            print("\nRandomOverSampler: DISABLED")
 
         # Validation split
         val_size = max(1, int(len(X_train_scaled) * self.cfg.val_ratio))
@@ -316,14 +307,14 @@ class BaselineIDS:
 
         # Generate report
         print("\n" + "=" * 70)
-        print("BASELINE RESULTS (WITH BorderlineSMOTE)" if self.cfg.use_bls else "BASELINE RESULTS")
+        print("BASELINE RESULTS (WITH RandomOverSampler)" if self.cfg.use_ros else "BASELINE RESULTS")
         print("=" * 70)
 
         report = per_class_report(y_test.values, y_pred, labels)
         print("\n" + report.to_string(index=False))
 
         # Save report
-        suffix = "_bls" if self.cfg.use_bls else ""
+        suffix = "_ros" if self.cfg.use_ros else ""
         report_path = os.path.join(self.cfg.save_dir, f"baseline_results{suffix}.csv")
         report.to_csv(report_path, index=False)
 
@@ -358,7 +349,7 @@ class BaselineIDS:
 def main():
     # Configuration
     cfg = BaselineConfig(
-        csv_path="wustl_iiot_2021.csv",
+        csv_path="../wustl_iiot_2021.csv",
         label_col="Traffic",
         drop_cols=("StartTime", "LastTime", "SrcAddr", "DstAddr", "sIpId", "dIpId"),
         test_size=0.30,
@@ -366,19 +357,16 @@ def main():
         learning_rate=5e-4,
         batch_size=128,
         epochs=100,
-        use_bls=True,  # Enable BorderlineSMOTE
-        bls_sampling_strategy="auto",  # Balance all minority classes
-        bls_k_neighbors=5,
-        bls_m_neighbors=10,
-        bls_kind="borderline-1",  # Use borderline-1 variant
-        use_class_weight=False,  # Usually not needed with BorderlineSMOTE
-        save_dir="./baseline_outputs"
+        use_ros=True,  # Enable RandomOverSampler
+        ros_sampling_strategy="auto",  # Balance all minority classes
+        use_class_weight=False,  # Usually not needed with RandomOverSampler
+        save_dir="../baseline_outputs"
     )
 
     print("=" * 70)
     print("BASELINE DNN FOR IIoT IDS")
     print("Single-Stage Multi-Class Classification")
-    print("Enhanced with BorderlineSMOTE Oversampling")
+    print("Enhanced with RandomOverSampler")
     print("=" * 70)
 
     baseline = BaselineIDS(cfg)
